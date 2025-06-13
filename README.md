@@ -101,8 +101,7 @@ This project includes an [`ai-documentation`](./ai-documentation/README.md) dire
 - Reference troubleshooting tips and specialized rules (charts, chatbot, etc.)
 
 **How to use:**
-- If you are using an AI-enabled IDE, the AI agent will automatically leverage the [AI Documentation & Rules](./ai-documentation/README.md) to assist you as you develop.
-- Human contributors can also consult these files directly for detailed standards and examples, but the primary audience is AI coding assistants.
+If you are using an AI-enabled IDE, the AI agent will automatically leverage the [AI Documentation & Rules](./ai-documentation/README.md) to assist you as you develop.
 
 By following these rules—either directly or via your AI assistant—you'll ensure your app is maintainable, accessible, and consistent with PatternFly best practices.
 
