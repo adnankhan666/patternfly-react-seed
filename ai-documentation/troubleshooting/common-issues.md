@@ -8,8 +8,6 @@ PatternFly development can present various challenges ranging from setup issues 
 
 ## Related Files
 
-- [**Component Issues**](./component-issues.md) - Component-specific troubleshooting
-- [**Performance Optimization**](./performance.md) - Performance-related problems and solutions
 - [**Setup Guide**](../setup/README.md) - Initial setup troubleshooting
 - [**External References**](../resources/external-links.md) - Additional troubleshooting resources
 
@@ -158,9 +156,9 @@ Module not found: Can't resolve '@patternfly/react-charts'
    ```jsx
    // ✅ Correct - Use design tokens
    const chartColors = [
-     'var(--pf-v6-chart-color-blue-300)',
-     'var(--pf-v6-chart-color-green-300)',
-     'var(--pf-v6-chart-color-orange-300)'
+     'var(--pf-t-chart-color-blue-300)',
+     'var(--pf-t-chart-color-green-300)',
+     'var(--pf-t-chart-color-orange-300)'
    ];
    <ChartDonut colorScale={chartColors} />
    ```
