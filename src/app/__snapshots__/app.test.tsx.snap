@@ -245,6 +245,7 @@ exports[`App tests should render default App component 1`] = `
                 aria-labelledby="Settings-2"
                 class="pf-v6-c-nav__subnav"
                 hidden=""
+                inert=""
               >
                 <ul
                   class="pf-v6-c-nav__list"
