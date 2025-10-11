@@ -67,14 +67,6 @@ const Canvas: React.FunctionComponent = () => {
         title="Create Data Science Project"
         isOpen={isModalOpen}
         onClose={handleModalToggle}
-        actions={[
-          <Button key="create" variant="primary" onClick={handleCreateProject}>
-            Let's Start
-          </Button>,
-          <Button key="cancel" variant="link" onClick={handleModalToggle}>
-            Cancel
-          </Button>,
-        ]}
       >
         <Form>
           <FormGroup label="Enter your Data Science project name" isRequired fieldId="project-name">
@@ -85,13 +77,21 @@ const Canvas: React.FunctionComponent = () => {
               name="project-name"
               value={projectName}
               onChange={(_event, value) => setProjectName(value)}
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleCreateProject();
                 }
               }}
             />
           </FormGroup>
+          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+            <Button variant="primary" onClick={handleCreateProject}>
+              Let's Start
+            </Button>
+            <Button variant="link" onClick={handleModalToggle}>
+              Cancel
+            </Button>
+          </div>
         </Form>
       </Modal>
     </>

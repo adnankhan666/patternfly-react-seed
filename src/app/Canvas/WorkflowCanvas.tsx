@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { NodeData, Connection, NODE_TYPES, WorkflowNode } from './types';
+import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition } from './types';
 import './WorkflowCanvas.css';
 
 interface WorkflowCanvasProps {
@@ -11,10 +11,19 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const [connections, setConnections] = React.useState<Connection[]>([]);
   const [selectedNode, setSelectedNode] = React.useState<string | null>(null);
   const [draggedNode, setDraggedNode] = React.useState<NodeData | null>(null);
-  const [connecting, setConnecting] = React.useState<{ sourceId: string; sourcePos: { x: number; y: number } } | null>(
-    null,
-  );
+  const [connecting, setConnecting] = React.useState<{
+    sourceId: string;
+    sourceConnector: ConnectorPosition;
+    sourcePos: { x: number; y: number };
+  } | null>(null);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+  const [resizingNode, setResizingNode] = React.useState<{
+    nodeId: string;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
   const canvasRef = React.useRef<HTMLDivElement>(null);
 
   // Handle dragging from node panel
@@ -41,6 +50,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       type: nodeType.id,
       label: nodeType.name,
       position: { x, y },
+      size: { width: 180, height: 100 },
       data: { color: nodeType.color, description: nodeType.description },
     };
 
@@ -79,20 +89,83 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     setDraggedNode(null);
   };
 
+  // Handle node resizing
+  const handleResizeStart = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node || !canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    setResizingNode({
+      nodeId,
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+      startWidth: node.size?.width || 180,
+      startHeight: node.size?.height || 100,
+    });
+  };
+
+  const handleResize = (e: React.MouseEvent) => {
+    if (!resizingNode || !canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const deltaX = currentX - resizingNode.startX;
+    const deltaY = currentY - resizingNode.startY;
+
+    const newWidth = Math.max(120, resizingNode.startWidth + deltaX);
+    const newHeight = Math.max(60, resizingNode.startHeight + deltaY);
+
+    setNodes(
+      nodes.map((n) =>
+        n.id === resizingNode.nodeId ? { ...n, size: { width: newWidth, height: newHeight } } : n,
+      ),
+    );
+  };
+
+  const handleResizeEnd = () => {
+    setResizingNode(null);
+  };
+
+  // Get connector position coordinates
+  const getConnectorPosition = (node: NodeData, connector: ConnectorPosition): { x: number; y: number } => {
+    const nodeWidth = node.size?.width || 180;
+    const nodeHeight = node.size?.height || 100;
+    const nodeHeaderHeight = 30;
+    const connectorOffset = 6;
+
+    switch (connector) {
+      case 'top':
+        return { x: node.position.x + nodeWidth / 2, y: node.position.y - connectorOffset };
+      case 'right':
+        return { x: node.position.x + nodeWidth + connectorOffset, y: node.position.y + nodeHeight / 2 };
+      case 'bottom':
+        return { x: node.position.x + nodeWidth / 2, y: node.position.y + nodeHeight + connectorOffset };
+      case 'left':
+        return { x: node.position.x - connectorOffset, y: node.position.y + nodeHeight / 2 };
+    }
+  };
+
   // Handle connections
-  const handleConnectionStart = (nodeId: string, e: React.MouseEvent) => {
+  const handleConnectionStart = (nodeId: string, connector: ConnectorPosition, e: React.MouseEvent) => {
     e.stopPropagation();
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
 
+    const connectorPos = getConnectorPosition(node, connector);
     setConnecting({
       sourceId: nodeId,
-      sourcePos: { x: node.position.x + 150, y: node.position.y + 40 },
+      sourceConnector: connector,
+      sourcePos: connectorPos,
     });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggedNode) {
+    if (resizingNode) {
+      handleResize(e);
+    } else if (draggedNode) {
       handleNodeDrag(e);
     }
 
@@ -105,7 +178,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     }
   };
 
-  const handleConnectionEnd = (targetNodeId: string, e: React.MouseEvent) => {
+  const handleConnectionEnd = (targetNodeId: string, targetConnector: ConnectorPosition, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!connecting || connecting.sourceId === targetNodeId) {
       setConnecting(null);
@@ -116,6 +189,8 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       id: `conn-${Date.now()}`,
       source: connecting.sourceId,
       target: targetNodeId,
+      sourceConnector: connecting.sourceConnector,
+      targetConnector: targetConnector,
     };
 
     setConnections([...connections, newConnection]);
@@ -133,10 +208,56 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     setSelectedNode(null);
   };
 
+  const handleDeleteConnection = (connectionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConnections(connections.filter((c) => c.id !== connectionId));
+  };
+
   const getNodeCenter = (node: NodeData) => ({
     x: node.position.x + 75,
     y: node.position.y + 40,
   });
+
+  // Generate curved path for connections
+  const getCurvedPath = (
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    sourceConnector?: ConnectorPosition,
+    targetConnector?: ConnectorPosition,
+  ): string => {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const curveStrength = Math.min(distance / 2, 100);
+
+    // Determine control point offsets based on connector positions
+    let cp1x = start.x;
+    let cp1y = start.y;
+    let cp2x = end.x;
+    let cp2y = end.y;
+
+    if (sourceConnector === 'right') {
+      cp1x = start.x + curveStrength;
+    } else if (sourceConnector === 'left') {
+      cp1x = start.x - curveStrength;
+    } else if (sourceConnector === 'top') {
+      cp1y = start.y - curveStrength;
+    } else if (sourceConnector === 'bottom') {
+      cp1y = start.y + curveStrength;
+    }
+
+    if (targetConnector === 'right') {
+      cp2x = end.x + curveStrength;
+    } else if (targetConnector === 'left') {
+      cp2x = end.x - curveStrength;
+    } else if (targetConnector === 'top') {
+      cp2y = end.y - curveStrength;
+    } else if (targetConnector === 'bottom') {
+      cp2y = end.y + curveStrength;
+    }
+
+    return `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
+  };
 
   return (
     <div className="workflow-container">
@@ -167,7 +288,10 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         onDragOver={handleCanvasDragOver}
         onClick={handleCanvasClick}
         onMouseMove={handleMouseMove}
-        onMouseUp={handleNodeDragEnd}
+        onMouseUp={() => {
+          handleNodeDragEnd();
+          handleResizeEnd();
+        }}
       >
         <svg className="connections-layer">
           {/* Render connections */}
@@ -176,33 +300,42 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             const targetNode = nodes.find((n) => n.id === conn.target);
             if (!sourceNode || !targetNode) return null;
 
-            const start = getNodeCenter(sourceNode);
-            const end = getNodeCenter(targetNode);
+            const start = getConnectorPosition(sourceNode, conn.sourceConnector || 'right');
+            const end = getConnectorPosition(targetNode, conn.targetConnector || 'left');
+            const pathData = getCurvedPath(start, end, conn.sourceConnector, conn.targetConnector);
 
             return (
-              <line
-                key={conn.id}
-                x1={start.x + 75}
-                y1={start.y}
-                x2={end.x - 75}
-                y2={end.y}
-                stroke="#6b7280"
-                strokeWidth="2"
-                markerEnd="url(#arrowhead)"
-              />
+              <g key={conn.id}>
+                {/* Invisible wider path for easier clicking */}
+                <path
+                  d={pathData}
+                  stroke="transparent"
+                  strokeWidth="20"
+                  fill="none"
+                  style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
+                  onClick={(e) => handleDeleteConnection(conn.id, e)}
+                />
+                {/* Visible connection path */}
+                <path
+                  d={pathData}
+                  stroke="#6b7280"
+                  strokeWidth="2"
+                  fill="none"
+                  markerEnd="url(#arrowhead)"
+                  style={{ pointerEvents: 'none' }}
+                />
+              </g>
             );
           })}
 
           {/* Temporary connection line while dragging */}
           {connecting && (
-            <line
-              x1={connecting.sourcePos.x}
-              y1={connecting.sourcePos.y}
-              x2={mousePos.x}
-              y2={mousePos.y}
+            <path
+              d={getCurvedPath(connecting.sourcePos, mousePos, connecting.sourceConnector)}
               stroke="#3b82f6"
               strokeWidth="2"
               strokeDasharray="5,5"
+              fill="none"
             />
           )}
 
@@ -222,6 +355,8 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             style={{
               left: node.position.x,
               top: node.position.y,
+              width: node.size?.width || 180,
+              height: node.size?.height || 100,
               borderColor: node.data?.color,
             }}
             onMouseDown={(e) => handleNodeDragStart(node, e)}
@@ -243,16 +378,35 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
               </button>
             </div>
             <div className="node-body">{node.data?.description}</div>
+            <div
+              className="node-resize-handle"
+              onMouseDown={(e) => handleResizeStart(node.id, e)}
+              title="Resize"
+            />
             <div className="node-connectors">
               <div
                 className="connector connector-input"
-                onMouseUp={(e) => handleConnectionEnd(node.id, e)}
-                title="Input"
+                onMouseUp={(e) => handleConnectionEnd(node.id, 'left', e)}
+                onMouseDown={(e) => handleConnectionStart(node.id, 'left', e)}
+                title="Left"
               />
               <div
                 className="connector connector-output"
-                onMouseDown={(e) => handleConnectionStart(node.id, e)}
-                title="Output"
+                onMouseDown={(e) => handleConnectionStart(node.id, 'right', e)}
+                onMouseUp={(e) => handleConnectionEnd(node.id, 'right', e)}
+                title="Right"
+              />
+              <div
+                className="connector connector-top"
+                onMouseDown={(e) => handleConnectionStart(node.id, 'top', e)}
+                onMouseUp={(e) => handleConnectionEnd(node.id, 'top', e)}
+                title="Top"
+              />
+              <div
+                className="connector connector-bottom"
+                onMouseDown={(e) => handleConnectionStart(node.id, 'bottom', e)}
+                onMouseUp={(e) => handleConnectionEnd(node.id, 'bottom', e)}
+                title="Bottom"
               />
             </div>
           </div>

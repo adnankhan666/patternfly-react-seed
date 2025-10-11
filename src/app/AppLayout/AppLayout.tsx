@@ -102,7 +102,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   };
 
   const Navigation = (
-    <Nav id="nav-primary-simple" theme="dark">
+    <Nav id="nav-primary-simple">
       <NavList id="nav-list-simple">
         {navigationData.map((item) => (isNavDataGroup(item) ? renderNavGroup(item) : renderNavItem(item)))}
       </NavList>
@@ -110,7 +110,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   );
 
   const Sidebar = (
-    <PageSidebar theme="dark">
+    <PageSidebar>
       <PageSidebarBody>{Navigation}</PageSidebarBody>
     </PageSidebar>
   );

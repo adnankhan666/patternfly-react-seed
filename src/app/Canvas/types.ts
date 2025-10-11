@@ -8,13 +8,18 @@ export interface NodeData {
   type: string;
   label: string;
   position: Position;
+  size?: { width: number; height: number };
   data?: Record<string, any>;
 }
+
+export type ConnectorPosition = 'top' | 'right' | 'bottom' | 'left';
 
 export interface Connection {
   id: string;
   source: string;
   target: string;
+  sourceConnector?: ConnectorPosition;
+  targetConnector?: ConnectorPosition;
 }
 
 export interface WorkflowNode {
