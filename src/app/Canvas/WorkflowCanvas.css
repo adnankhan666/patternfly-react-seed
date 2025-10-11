@@ -1,0 +1,207 @@
+.workflow-container {
+  display: flex;
+  height: calc(100vh - 100px);
+  width: 100%;
+  background: #f9fafb;
+}
+
+.node-panel {
+  width: 280px;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.node-panel-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: #111827;
+}
+
+.node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.node-type {
+  padding: 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid;
+  border-radius: 6px;
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.node-type:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.node-type:active {
+  cursor: grabbing;
+}
+
+.node-type-name {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.node-type-description {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.workflow-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.connections-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.workflow-node {
+  position: absolute;
+  width: 150px;
+  background: white;
+  border: 2px solid;
+  border-radius: 8px;
+  cursor: move;
+  user-select: none;
+  z-index: 10;
+  transition: box-shadow 0.2s;
+}
+
+.workflow-node:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.workflow-node.selected {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  z-index: 20;
+}
+
+.node-header {
+  padding: 8px 12px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-delete {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0.8;
+}
+
+.node-delete:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.node-body {
+  padding: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  min-height: 40px;
+}
+
+.node-connectors {
+  position: relative;
+  height: 0;
+}
+
+.connector {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid white;
+  cursor: pointer;
+  z-index: 30;
+}
+
+.connector:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.connector-input {
+  left: -6px;
+  top: -45px;
+}
+
+.connector-output {
+  right: -6px;
+  top: -45px;
+}
+
+.canvas-empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #9ca3af;
+  font-size: 16px;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+.canvas-empty-state p {
+  margin: 0;
+}
+
+/* Scrollbar styling */
+.node-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.node-panel::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.node-panel::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.node-panel::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
