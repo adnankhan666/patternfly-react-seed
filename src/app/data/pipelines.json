@@ -1,0 +1,52 @@
+[
+  {
+    "id": "pipeline-001",
+    "name": "Data Preprocessing Pipeline",
+    "status": "Active",
+    "lastRun": "2025-10-17T09:30:00Z",
+    "success": true,
+    "duration": "12m 34s",
+    "stages": ["Data Ingestion", "Cleaning", "Transformation", "Validation"],
+    "owner": "data-eng-team"
+  },
+  {
+    "id": "pipeline-002",
+    "name": "Model Training Pipeline",
+    "status": "Running",
+    "lastRun": "2025-10-17T10:15:00Z",
+    "success": null,
+    "duration": "Running",
+    "stages": ["Data Split", "Feature Engineering", "Model Training", "Evaluation"],
+    "owner": "ml-ops-team"
+  },
+  {
+    "id": "pipeline-003",
+    "name": "Batch Prediction Pipeline",
+    "status": "Active",
+    "lastRun": "2025-10-17T08:00:00Z",
+    "success": true,
+    "duration": "8m 15s",
+    "stages": ["Load Model", "Fetch Data", "Prediction", "Store Results"],
+    "owner": "ml-ops-team"
+  },
+  {
+    "id": "pipeline-004",
+    "name": "Model Retraining Pipeline",
+    "status": "Failed",
+    "lastRun": "2025-10-16T22:45:00Z",
+    "success": false,
+    "duration": "Failed at 15m 23s",
+    "stages": ["Data Collection", "Training", "Validation", "Deployment"],
+    "owner": "ml-ops-team"
+  },
+  {
+    "id": "pipeline-005",
+    "name": "Data Quality Check Pipeline",
+    "status": "Active",
+    "lastRun": "2025-10-17T07:00:00Z",
+    "success": true,
+    "duration": "5m 42s",
+    "stages": ["Schema Validation", "Quality Metrics", "Anomaly Detection", "Reporting"],
+    "owner": "data-quality-team"
+  }
+]

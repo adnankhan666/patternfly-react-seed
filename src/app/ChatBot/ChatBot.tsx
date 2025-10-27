@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { sendMessageToClaude, WorkflowContext } from '../../services/claudeService';
 import './ChatBot.css';
 
 interface Message {
@@ -8,12 +9,16 @@ interface Message {
   timestamp: Date;
 }
 
-const ChatBot: React.FunctionComponent = () => {
+interface ChatBotProps {
+  workflowContext?: WorkflowContext;
+}
+
+const ChatBot: React.FunctionComponent<ChatBotProps> = ({ workflowContext }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m Claude, your AI assistant. How can I help you today?',
+      text: 'Hello! I\'m Gemini, your AI assistant. How can I help you today?',
       sender: 'bot',
       timestamp: new Date(),
     },
@@ -34,38 +39,56 @@ const ChatBot: React.FunctionComponent = () => {
     setIsOpen(!isOpen);
   };
 
-  const simulateResponse = (userMessage: string) => {
+  const getGeminiResponse = async (userMessage: string) => {
     setIsTyping(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const responses = [
-        'I can help you with that! What specific aspect would you like to know more about?',
-        'That\'s a great question! Let me provide you with some information.',
-        'I understand. Here\'s what I can tell you about that.',
-        'Interesting! I\'d be happy to assist you with this.',
-        'Let me help you navigate through this. What would you like to do?',
-      ];
+    try {
+      // Build conversation history for API call (excluding the initial greeting)
+      const conversationHistory = messages
+        .slice(1) // Skip the initial greeting
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+          content: msg.text,
+        }));
 
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      // Call Gemini API
+      const responseText = await sendMessageToClaude(
+        userMessage,
+        conversationHistory,
+        workflowContext
+      );
 
       const botMessage: Message = {
         id: Date.now().toString(),
-        text: randomResponse,
+        text: responseText,
         sender: 'bot',
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error getting Gemini response:', error);
+
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        text: 'Sorry, I encountered an error while processing your message. Please try again.',
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
   };
 
   const handleSend = () => {
     if (inputValue.trim()) {
+      const userMessageText = inputValue;
+
       const userMessage: Message = {
         id: Date.now().toString(),
-        text: inputValue,
+        text: userMessageText,
         sender: 'user',
         timestamp: new Date(),
       };
@@ -73,8 +96,8 @@ const ChatBot: React.FunctionComponent = () => {
       setMessages((prev) => [...prev, userMessage]);
       setInputValue('');
 
-      // Simulate bot response
-      simulateResponse(inputValue);
+      // Get Gemini response
+      getGeminiResponse(userMessageText);
     }
   };
 
@@ -110,9 +133,9 @@ const ChatBot: React.FunctionComponent = () => {
         <div className="chat-window">
           <div className="chat-header">
             <div className="chat-header-content">
-              <div className="chat-avatar">C</div>
+              <div className="chat-avatar">G</div>
               <div>
-                <div className="chat-title">Claude AI</div>
+                <div className="chat-title">Gemini AI</div>
                 <div className="chat-status">Online</div>
               </div>
             </div>

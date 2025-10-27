@@ -1,0 +1,66 @@
+[
+  {
+    "id": "exp-001",
+    "name": "Image Classification Training",
+    "status": "Running",
+    "created": "2025-10-15T10:30:00Z",
+    "metrics": {
+      "accuracy": 92.5,
+      "loss": 0.18,
+      "epochs": 45
+    },
+    "framework": "TensorFlow",
+    "owner": "data-science-team"
+  },
+  {
+    "id": "exp-002",
+    "name": "NLP Sentiment Analysis",
+    "status": "Completed",
+    "created": "2025-10-14T08:15:00Z",
+    "metrics": {
+      "accuracy": 89.3,
+      "f1Score": 0.88,
+      "epochs": 30
+    },
+    "framework": "PyTorch",
+    "owner": "nlp-team"
+  },
+  {
+    "id": "exp-003",
+    "name": "Object Detection Model",
+    "status": "Running",
+    "created": "2025-10-16T14:20:00Z",
+    "metrics": {
+      "mAP": 0.76,
+      "precision": 0.82,
+      "epochs": 60
+    },
+    "framework": "TensorFlow",
+    "owner": "computer-vision-team"
+  },
+  {
+    "id": "exp-004",
+    "name": "Time Series Forecasting",
+    "status": "Failed",
+    "created": "2025-10-13T16:45:00Z",
+    "metrics": {
+      "rmse": 2.34,
+      "mae": 1.87
+    },
+    "framework": "Keras",
+    "owner": "forecasting-team"
+  },
+  {
+    "id": "exp-005",
+    "name": "Recommendation System",
+    "status": "Completed",
+    "created": "2025-10-12T11:00:00Z",
+    "metrics": {
+      "ndcg": 0.85,
+      "recall": 0.79,
+      "epochs": 25
+    },
+    "framework": "PyTorch",
+    "owner": "recommender-team"
+  }
+]

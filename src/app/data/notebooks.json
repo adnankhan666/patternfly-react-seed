@@ -1,0 +1,42 @@
+[
+  {
+    "id": "nb-001",
+    "name": "Data Exploration Notebook",
+    "status": "Running",
+    "created": "2025-10-15",
+    "lastModified": "2025-10-17T09:30:00Z",
+    "size": "45.2 MB",
+    "framework": "JupyterLab",
+    "owner": "john.doe@company.com"
+  },
+  {
+    "id": "nb-002",
+    "name": "Model Training Notebook",
+    "status": "Stopped",
+    "created": "2025-10-10",
+    "lastModified": "2025-10-16T14:20:00Z",
+    "size": "128.5 MB",
+    "framework": "JupyterLab",
+    "owner": "jane.smith@company.com"
+  },
+  {
+    "id": "nb-003",
+    "name": "Feature Engineering Notebook",
+    "status": "Running",
+    "created": "2025-10-12",
+    "lastModified": "2025-10-17T08:15:00Z",
+    "size": "67.8 MB",
+    "framework": "VSCode",
+    "owner": "bob.johnson@company.com"
+  },
+  {
+    "id": "nb-004",
+    "name": "Model Evaluation Notebook",
+    "status": "Stopped",
+    "created": "2025-10-08",
+    "lastModified": "2025-10-14T16:45:00Z",
+    "size": "92.3 MB",
+    "framework": "JupyterLab",
+    "owner": "alice.williams@company.com"
+  }
+]

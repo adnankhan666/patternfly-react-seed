@@ -1,0 +1,57 @@
+[
+  {
+    "id": "mr-001",
+    "name": "Customer Churn Model v3.2",
+    "version": "3.2.0",
+    "registered": "2025-10-15",
+    "framework": "TensorFlow",
+    "accuracy": 94.5,
+    "status": "Production",
+    "stage": "Production",
+    "tags": ["churn", "classification", "production"]
+  },
+  {
+    "id": "mr-002",
+    "name": "Fraud Detection Model v2.1",
+    "version": "2.1.5",
+    "registered": "2025-10-12",
+    "framework": "PyTorch",
+    "accuracy": 96.8,
+    "status": "Production",
+    "stage": "Production",
+    "tags": ["fraud", "anomaly-detection", "production"]
+  },
+  {
+    "id": "mr-003",
+    "name": "Product Recommender v1.9",
+    "version": "1.9.2",
+    "registered": "2025-10-10",
+    "framework": "TensorFlow",
+    "accuracy": 88.3,
+    "status": "Staging",
+    "stage": "Staging",
+    "tags": ["recommendation", "collaborative-filtering", "staging"]
+  },
+  {
+    "id": "mr-004",
+    "name": "Sentiment Classifier v4.0",
+    "version": "4.0.1",
+    "registered": "2025-10-08",
+    "framework": "PyTorch",
+    "accuracy": 91.7,
+    "status": "Archived",
+    "stage": "Archived",
+    "tags": ["nlp", "sentiment", "archived"]
+  },
+  {
+    "id": "mr-005",
+    "name": "Demand Forecast Model v2.5",
+    "version": "2.5.0",
+    "registered": "2025-10-14",
+    "framework": "Keras",
+    "accuracy": 89.2,
+    "status": "Production",
+    "stage": "Production",
+    "tags": ["forecasting", "time-series", "production"]
+  }
+]

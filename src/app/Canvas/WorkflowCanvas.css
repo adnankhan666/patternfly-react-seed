@@ -1,6 +1,6 @@
 .workflow-container {
   display: flex;
-  height: calc(100vh - 100px);
+  height: 100%;
   width: 100%;
   background: #f9fafb;
 }
@@ -60,8 +60,15 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
+  background-color: #fafafa;
+  background-image:
+    linear-gradient(#e5e7eb 1px, transparent 1px),
+    linear-gradient(90deg, #e5e7eb 1px, transparent 1px);
   background-size: 20px 20px;
+}
+
+.workflow-canvas.no-grid {
+  background-image: none;
 }
 
 .connections-layer {
@@ -244,4 +251,58 @@
 
 .node-panel::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+
+/* Action Bubbles */
+.node-action-bubbles {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 50;
+}
+
+.workflow-node:hover .node-action-bubbles {
+  opacity: 1;
+}
+
+.action-bubble {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-bubble:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.action-bubble svg {
+  width: 12px;
+  height: 12px;
+}
+
+.launch-bubble {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.chat-bubble {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.reload-bubble {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
 }

@@ -18,7 +18,8 @@ import {
 } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
 import { useNavigationData, isNavDataGroup, NavDataItem, NavDataHref, NavDataGroup } from '@app/navData';
-import { ChatBot } from '@app/ChatBot/ChatBot';
+import { ChatBot } from '../ChatBot/ChatBot';
+import { allData } from '../data';
 
 interface IAppLayout {
   children: React.ReactNode;
@@ -130,15 +131,19 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     </SkipToContent>
   );
   return (
-    <Page
-      mainContainerId={pageId}
-      masthead={masthead}
-      sidebar={sidebarOpen && Sidebar}
-      skipToContent={PageSkipToContent}
-    >
-      {children}
-      <ChatBot />
-    </Page>
+    <>
+      <Page
+        mainContainerId={pageId}
+        masthead={masthead}
+        sidebar={sidebarOpen && Sidebar}
+        skipToContent={PageSkipToContent}
+      >
+        {children}
+      </Page>
+
+      {/* Global ChatBot with all application data */}
+      <ChatBot workflowContext={allData} />
+    </>
   );
 };
 

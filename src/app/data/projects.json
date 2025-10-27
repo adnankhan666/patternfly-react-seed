@@ -1,0 +1,57 @@
+[
+  {
+    "id": "proj-001",
+    "name": "Customer Churn Prediction",
+    "description": "ML project to predict customer churn using historical data",
+    "status": "Active",
+    "created": "2025-09-01",
+    "team": "Data Science Team",
+    "notebooks": 12,
+    "models": 5,
+    "pipelines": 3
+  },
+  {
+    "id": "proj-002",
+    "name": "Fraud Detection System",
+    "description": "Real-time fraud detection using anomaly detection algorithms",
+    "status": "Active",
+    "created": "2025-08-15",
+    "team": "Security ML Team",
+    "notebooks": 8,
+    "models": 3,
+    "pipelines": 2
+  },
+  {
+    "id": "proj-003",
+    "name": "Product Recommendation Engine",
+    "description": "Personalized product recommendations for e-commerce platform",
+    "status": "Active",
+    "created": "2025-07-20",
+    "team": "Recommender Team",
+    "notebooks": 15,
+    "models": 7,
+    "pipelines": 4
+  },
+  {
+    "id": "proj-004",
+    "name": "Sentiment Analysis Dashboard",
+    "description": "Real-time sentiment analysis of customer feedback",
+    "status": "Archived",
+    "created": "2025-06-10",
+    "team": "NLP Team",
+    "notebooks": 6,
+    "models": 2,
+    "pipelines": 1
+  },
+  {
+    "id": "proj-005",
+    "name": "Demand Forecasting",
+    "description": "Sales and demand forecasting for inventory management",
+    "status": "Active",
+    "created": "2025-09-10",
+    "team": "Forecasting Team",
+    "notebooks": 10,
+    "models": 4,
+    "pipelines": 3
+  }
+]
