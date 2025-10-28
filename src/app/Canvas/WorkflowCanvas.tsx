@@ -43,6 +43,9 @@ import {
   DownloadIcon,
   UploadIcon,
   ThIcon,
+  SearchPlusIcon,
+  SearchMinusIcon,
+  CubesIcon,
 } from '@patternfly/react-icons';
 import { Alert, AlertGroup, AlertActionCloseButton, AlertVariant } from '@patternfly/react-core';
 import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition } from './types';
@@ -61,6 +64,9 @@ import {
   GRID_SIZE,
   GRID_ENABLED_DEFAULT,
 } from './constants';
+import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector } from './components';
+import { saveWorkflowState, loadWorkflowState } from '../../services/workflowService';
+import { WorkflowTemplate } from '../../data/workflowTemplates';
 import './WorkflowCanvas.css';
 
 interface WorkflowCanvasProps {
@@ -109,22 +115,114 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   } | null>(null);
   const canvasRef = React.useRef<HTMLDivElement>(null);
 
-  // Helper function to add alerts/toasts
-  const addAlert = (title: string, variant: AlertVariant = AlertVariant.info) => {
+  // Loading states for data operations
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isImporting, setIsImporting] = React.useState(false);
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  // Execution animation state
+  const [isExecuting, setIsExecuting] = React.useState(false);
+  const [executingNodes, setExecutingNodes] = React.useState<Set<string>>(new Set());
+  const [completedNodes, setCompletedNodes] = React.useState<Set<string>>(new Set());
+  const [activeConnections, setActiveConnections] = React.useState<Set<string>>(new Set());
+  const [particles, setParticles] = React.useState<Array<{
+    id: string;
+    connectionId: string;
+    progress: number;
+  }>>([]);
+  const [ongoingFlow, setOngoingFlow] = React.useState(false);
+  const [flowParticles, setFlowParticles] = React.useState<Array<{
+    id: string;
+    connectionId: string;
+    progress: number;
+    direction: 'forward' | 'backward';
+  }>>([]);
+
+  // Execution progress tracking
+  const [executionProgress, setExecutionProgress] = React.useState(0);
+  const [executionStatus, setExecutionStatus] = React.useState<string>('');
+
+  // Zoom and pan state
+  const [zoom, setZoom] = React.useState(1);
+  const [pan, setPan] = React.useState({ x: 0, y: 0 });
+  const [previousZoom, setPreviousZoom] = React.useState(1);
+  const [isPanning, setIsPanning] = React.useState(false);
+  const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
+  const [spacePressed, setSpacePressed] = React.useState(false);
+  const MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 2;
+
+  // Zoom control handlers (memoized with useCallback)
+  const handleZoomIn = React.useCallback(() => {
+    setZoom((prevZoom) => Math.min(prevZoom + 0.1, MAX_ZOOM));
+  }, [MAX_ZOOM]);
+
+  const handleZoomOut = React.useCallback(() => {
+    setZoom((prevZoom) => Math.max(prevZoom - 0.1, MIN_ZOOM));
+  }, [MIN_ZOOM]);
+
+  const handleResetZoom = React.useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  // Pan handlers for canvas dragging (memoized with useCallback)
+  const handleCanvasPanStart = React.useCallback((e: React.MouseEvent) => {
+    // Only pan if space bar is pressed or middle mouse button (button === 1)
+    const target = e.target as HTMLElement;
+    const isCanvasBackground = target.classList.contains('workflow-canvas') || target.classList.contains('canvas-content');
+
+    if (isCanvasBackground && (spacePressed || e.button === 1)) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      e.preventDefault();
+    }
+  }, [spacePressed, pan.x, pan.y]);
+
+  const handleCanvasPanMove = React.useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+    }
+  }, [isPanning, panStart.x, panStart.y]);
+
+  const handleCanvasPanEnd = React.useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  // Mouse wheel zoom handler (Ctrl/Cmd + scroll only) (memoized with useCallback)
+  const handleWheel = React.useCallback((e: React.WheelEvent) => {
+    // Only zoom if Ctrl (Windows/Linux) or Cmd (Mac) is pressed
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+    if (cmdOrCtrl) {
+      e.preventDefault();
+      // Zoom in/out with mouse wheel
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      const newZoom = Math.min(Math.max(zoom + delta, MIN_ZOOM), MAX_ZOOM);
+      setZoom(newZoom);
+    }
+  }, [zoom, MIN_ZOOM, MAX_ZOOM]);
+
+  // Helper function to add alerts/toasts (memoized with useCallback)
+  const addAlert = React.useCallback((title: string, variant: AlertVariant = AlertVariant.info) => {
     const id = `alert-${Date.now()}`;
     setAlerts((prevAlerts) => [...prevAlerts, { id, title, variant }]);
     // Auto-dismiss after configured time
     setTimeout(() => {
       setAlerts((prevAlerts) => prevAlerts.filter((alert) => alert.id !== id));
     }, ALERT_AUTO_DISMISS_MS);
-  };
+  }, []);
 
-  const removeAlert = (id: string) => {
+  const removeAlert = React.useCallback((id: string) => {
     setAlerts((prevAlerts) => prevAlerts.filter((alert) => alert.id !== id));
-  };
+  }, []);
 
-  // Snap position to grid
-  const snapToGrid = (x: number, y: number): { x: number; y: number } => {
+  // Snap position to grid (memoized with useCallback)
+  const snapToGrid = React.useCallback((x: number, y: number): { x: number; y: number } => {
     if (!gridEnabled) {
       return { x, y };
     }
@@ -132,7 +230,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       x: Math.round(x / GRID_SIZE) * GRID_SIZE,
       y: Math.round(y / GRID_SIZE) * GRID_SIZE,
     };
-  };
+  }, [gridEnabled]);
 
   // History management for undo/redo
   const saveToHistory = React.useCallback((newNodes: NodeData[], newConnections: Connection[]) => {
@@ -149,7 +247,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     setHistoryIndex((prev) => Math.min(prev + 1, MAX_HISTORY_STEPS - 1));
   }, [historyIndex]);
 
-  const undo = () => {
+  const undo = React.useCallback(() => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
@@ -158,9 +256,9 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       setConnections(state.connections);
       addAlert('Undo successful', AlertVariant.info);
     }
-  };
+  }, [historyIndex, history, addAlert]);
 
-  const redo = () => {
+  const redo = React.useCallback(() => {
     if (historyIndex < history.length - 1) {
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
@@ -169,16 +267,54 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       setConnections(state.connections);
       addAlert('Redo successful', AlertVariant.info);
     }
-  };
+  }, [historyIndex, history, addAlert]);
 
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
+  // Memoize undo/redo availability
+  const canUndo = React.useMemo(() => historyIndex > 0, [historyIndex]);
+  const canRedo = React.useMemo(() => historyIndex < history.length - 1, [historyIndex, history.length]);
+
+  // Load workflow from localStorage on mount
+  React.useEffect(() => {
+    const loadWorkflow = async () => {
+      setIsLoading(true);
+      try {
+        const savedData = localStorage.getItem(`workflow-${projectName}`);
+        if (savedData) {
+          // Simulate network delay for realistic loading experience
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          const workflowData = JSON.parse(savedData);
+          if (workflowData.nodes && workflowData.connections) {
+            setNodes(workflowData.nodes);
+            setConnections(workflowData.connections);
+            saveToHistory(workflowData.nodes, workflowData.connections);
+            console.log('Workflow loaded from localStorage:', workflowData);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading workflow:', error);
+        addAlert('Failed to load saved workflow', AlertVariant.warning);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWorkflow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectName]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Space bar for pan mode
+      if (e.code === 'Space' && !spacePressed) {
+        setSpacePressed(true);
+        e.preventDefault();
         return;
       }
 
@@ -259,11 +395,21 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Release space bar
+      if (e.code === 'Space') {
+        setSpacePressed(false);
+        setIsPanning(false);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedNode, selectedNodes, copiedNodes, nodes, connections, historyIndex, history]);
+  }, [selectedNode, selectedNodes, copiedNodes, nodes, connections, historyIndex, history, spacePressed]);
 
   // Auto-save functionality
   React.useEffect(() => {
@@ -301,8 +447,55 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     };
   }, [isDrawerExpanded]);
 
-  // Map node types to their routes
-  const getNodeRoute = (nodeType: string): string => {
+  // Auto-adjust zoom when drawer opens/closes
+  React.useEffect(() => {
+    if (!canvasRef.current || nodes.length === 0) return;
+
+    const drawerWidth = 400; // Drawer panel width
+    const padding = 80; // Generous padding for better visibility
+
+    if (isDrawerExpanded) {
+      // Store current zoom before adjusting
+      setPreviousZoom(zoom);
+
+      // Calculate bounding box of all nodes
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      nodes.forEach(node => {
+        const nodeWidth = node.size?.width || DEFAULT_NODE_WIDTH;
+        const nodeHeight = node.size?.height || DEFAULT_NODE_HEIGHT;
+        minX = Math.min(minX, node.position.x);
+        minY = Math.min(minY, node.position.y);
+        maxX = Math.max(maxX, node.position.x + nodeWidth);
+        maxY = Math.max(maxY, node.position.y + nodeHeight);
+      });
+
+      const contentWidth = maxX - minX;
+      const contentHeight = maxY - minY;
+
+      // Available canvas space when drawer is open
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const availableWidth = canvasRect.width - drawerWidth - padding * 2;
+      const availableHeight = canvasRect.height - padding * 2;
+
+      // Calculate zoom to fit all nodes with better minimum
+      const zoomX = availableWidth / contentWidth;
+      const zoomY = availableHeight / contentHeight;
+      const optimalZoom = Math.min(zoomX, zoomY, 1); // Don't zoom in, only out
+
+      // Only shrink if necessary, and don't go below 0.6 (60%)
+      const minimumComfortableZoom = 0.6;
+      if (optimalZoom < zoom) {
+        setZoom(Math.max(optimalZoom, minimumComfortableZoom));
+      }
+    } else {
+      // Restore previous zoom when drawer closes
+      setZoom(previousZoom);
+    }
+  }, [isDrawerExpanded, nodes]);
+
+  // Map node types to their routes (memoized with useCallback)
+  const getNodeRoute = React.useCallback((nodeType: string): string => {
     const routeMap: Record<string, string> = {
       experiments: '/experiments',
       extensions: '/extensions',
@@ -318,16 +511,16 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       tuning: '/tuning',
     };
     return routeMap[nodeType] || '/';
-  };
+  }, []);
 
-  // Handle dragging from node panel
-  const handleDragStart = (nodeType: WorkflowNode, e: React.DragEvent) => {
+  // Handle dragging from node panel (memoized with useCallback)
+  const handleDragStart = React.useCallback((nodeType: WorkflowNode, e: React.DragEvent) => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('nodeType', JSON.stringify(nodeType));
-  };
+  }, []);
 
-  // Handle drop on canvas
-  const handleCanvasDrop = (e: React.DragEvent) => {
+  // Handle drop on canvas (memoized with useCallback)
+  const handleCanvasDrop = React.useCallback((e: React.DragEvent) => {
     e.preventDefault();
     if (!canvasRef.current) return;
 
@@ -336,8 +529,10 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
     const nodeType = JSON.parse(nodeTypeData) as WorkflowNode;
     const rect = canvasRef.current.getBoundingClientRect();
-    const rawX = e.clientX - rect.left;
-    const rawY = e.clientY - rect.top;
+
+    // Convert mouse position to canvas coordinates (accounting for zoom and pan)
+    const rawX = (e.clientX - rect.left - pan.x) / zoom;
+    const rawY = (e.clientY - rect.top - pan.y) / zoom;
 
     // Snap to grid
     const { x, y } = snapToGrid(rawX, rawY);
@@ -354,26 +549,30 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     const newNodes = [...nodes, newNode];
     setNodes(newNodes);
     saveToHistory(newNodes, connections);
-  };
+  }, [pan.x, pan.y, zoom, snapToGrid, nodes, connections, saveToHistory]);
 
-  const handleCanvasDragOver = (e: React.DragEvent) => {
+  const handleCanvasDragOver = React.useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-  };
+  }, []);
 
   // Handle node dragging on canvas
   const [dragOffset, setDragOffset] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleNodeDragStart = (node: NodeData, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Calculate offset from mouse position to node top-left corner
-    const nodeRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    if (canvasRect) {
-      const offsetX = e.clientX - nodeRect.left;
-      const offsetY = e.clientY - nodeRect.top;
-      setDragOffset({ x: offsetX, y: offsetY });
-    }
+    if (!canvasRef.current) return;
+
+    // Get the mouse position relative to the canvas (accounting for zoom and pan)
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom;
+    const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom;
+
+    // Calculate offset from mouse to node position
+    const offsetX = mouseX - node.position.x;
+    const offsetY = mouseY - node.position.y;
+    setDragOffset({ x: offsetX, y: offsetY });
+
     setDraggedNode(node);
     setSelectedNode(node.id);
   };
@@ -382,14 +581,22 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     if (!draggedNode || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    let x = e.clientX - rect.left - dragOffset.x;
-    let y = e.clientY - rect.top - dragOffset.y;
 
-    // Clamp position within canvas bounds
+    // Convert mouse position to canvas coordinates (accounting for zoom and pan)
+    const mouseX = (e.clientX - rect.left - pan.x) / zoom;
+    const mouseY = (e.clientY - rect.top - pan.y) / zoom;
+
+    // Calculate new position
+    let x = mouseX - dragOffset.x;
+    let y = mouseY - dragOffset.y;
+
+    // Clamp position within canvas bounds (in canvas coordinates)
     const nodeWidth = draggedNode.size?.width || DEFAULT_NODE_WIDTH;
     const nodeHeight = draggedNode.size?.height || DEFAULT_NODE_HEIGHT;
-    x = Math.max(0, Math.min(x, rect.width - nodeWidth));
-    y = Math.max(0, Math.min(y, rect.height - nodeHeight));
+    const maxX = (rect.width / zoom) - nodeWidth;
+    const maxY = (rect.height / zoom) - nodeHeight;
+    x = Math.max(0, Math.min(x, maxX));
+    y = Math.max(0, Math.min(y, maxY));
 
     setNodes(
       nodes.map((n) =>
@@ -493,7 +700,9 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (resizingNode) {
+    if (isPanning) {
+      handleCanvasPanMove(e);
+    } else if (resizingNode) {
       handleResize(e);
     } else if (draggedNode) {
       handleNodeDrag(e);
@@ -522,19 +731,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       return;
     }
 
-    // Check for duplicate connections
-    const isDuplicate = connections.some(
-      (conn) =>
-        (conn.source === connecting.sourceId && conn.target === targetNodeId) ||
-        (conn.source === targetNodeId && conn.target === connecting.sourceId)
-    );
-
-    if (isDuplicate) {
-      addAlert('Connection already exists between these nodes', AlertVariant.warning);
-      setConnecting(null);
-      return;
-    }
-
+    // Allow multiple connections between nodes
     const newConnection: Connection = {
       id: `conn-${Date.now()}`,
       source: connecting.sourceId,
@@ -591,55 +788,373 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     addAlert('Connection deleted', AlertVariant.success);
   };
 
-  const toggleGrid = () => {
+  const toggleGrid = React.useCallback(() => {
     setGridEnabled(!gridEnabled);
     addAlert(gridEnabled ? 'Grid disabled' : 'Grid enabled', AlertVariant.info);
-  };
+  }, [gridEnabled, addAlert]);
 
-  // Toolbar actions
-  const handleSave = () => {
+  // Track current workflow ID for database operations
+  const [currentWorkflowId, setCurrentWorkflowId] = React.useState<string | null>(null);
+
+  // Template selector state
+  const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = React.useState(false);
+
+  // Toolbar actions (memoized with useCallback)
+  const handleSave = React.useCallback(async () => {
+    setIsLoading(true);
     try {
+      // Save to database via API
+      const savedWorkflow = await saveWorkflowState(
+        currentWorkflowId,
+        projectName,
+        `Workflow for ${projectName}`,
+        nodes as any,
+        connections as any
+      );
+
+      // Update current workflow ID
+      if (!currentWorkflowId && savedWorkflow.id) {
+        setCurrentWorkflowId(savedWorkflow.id);
+      }
+
+      // Also save to localStorage as backup
       const workflowData = {
         projectName,
         nodes,
         connections,
         timestamp: new Date().toISOString(),
+        workflowId: savedWorkflow.id,
       };
       localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
-      console.log('Workflow saved:', workflowData);
-      addAlert('Workflow saved successfully!', AlertVariant.success);
+
+      console.log('Workflow saved:', savedWorkflow);
+      addAlert('Workflow saved successfully to database!', AlertVariant.success);
     } catch (error) {
       console.error('Error saving workflow:', error);
-      addAlert('Failed to save workflow. Please try again.', AlertVariant.danger);
+      // Fallback to localStorage only
+      try {
+        const workflowData = {
+          projectName,
+          nodes,
+          connections,
+          timestamp: new Date().toISOString(),
+        };
+        localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
+        addAlert('Workflow saved locally (database unavailable)', AlertVariant.warning);
+      } catch (localError) {
+        addAlert('Failed to save workflow. Please try again.', AlertVariant.danger);
+      }
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [currentWorkflowId, projectName, nodes, connections, addAlert]);
 
-  const handleExecute = () => {
+  // Memoize execution order (expensive topological sort)
+  const executionOrder = React.useMemo(() => {
+    if (nodes.length === 0) return [];
+
+    const nodeIds = nodes.map(n => n.id);
+    const inDegree: Record<string, number> = {};
+    const adjacency: Record<string, string[]> = {};
+
+    // Initialize
+    nodeIds.forEach(id => {
+      inDegree[id] = 0;
+      adjacency[id] = [];
+    });
+
+    // Build graph
+    connections.forEach(conn => {
+      adjacency[conn.source].push(conn.target);
+      inDegree[conn.target] = (inDegree[conn.target] || 0) + 1;
+    });
+
+    // Topological sort by levels
+    const levels: string[][] = [];
+    const remaining = new Set(nodeIds);
+
+    while (remaining.size > 0) {
+      const currentLevel = Array.from(remaining).filter(id => inDegree[id] === 0);
+
+      if (currentLevel.length === 0) {
+        // If no nodes with 0 in-degree, take all remaining (handles cycles/disconnected nodes)
+        levels.push(Array.from(remaining));
+        break;
+      }
+
+      levels.push(currentLevel);
+      currentLevel.forEach(id => {
+        remaining.delete(id);
+        adjacency[id].forEach(targetId => {
+          inDegree[targetId]--;
+        });
+      });
+    }
+
+    return levels;
+  }, [nodes, connections]);
+
+  const handleExecute = React.useCallback(async () => {
     if (nodes.length === 0) {
       addAlert('Cannot execute empty workflow. Add nodes first.', AlertVariant.warning);
       return;
     }
-    console.log('Executing workflow with nodes:', nodes);
-    console.log('Connections:', connections);
-    addAlert('Workflow execution started! Check console for details.', AlertVariant.info);
-  };
 
-  const handleClear = () => {
+    if (isExecuting) {
+      addAlert('Workflow is already executing', AlertVariant.warning);
+      return;
+    }
+
+    setIsExecuting(true);
+    setExecutingNodes(new Set());
+    setCompletedNodes(new Set());
+    setActiveConnections(new Set());
+    setParticles([]);
+    setExecutionProgress(0);
+    setExecutionStatus('Initializing workflow execution...');
+
+    addAlert('Workflow execution started!', AlertVariant.info);
+
+    console.log('Execution order:', executionOrder);
+
+    const totalNodes = nodes.length;
+
+    // Execute nodes level by level
+    for (let levelIndex = 0; levelIndex < executionOrder.length; levelIndex++) {
+      const level = executionOrder[levelIndex];
+
+      // Update status message
+      setExecutionStatus(`Executing level ${levelIndex + 1} of ${executionOrder.length}...`);
+
+      // Mark all nodes in this level as executing
+      setExecutingNodes(new Set(level));
+
+      // Simulate node execution (1.5 seconds per level)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Mark nodes as completed
+      setCompletedNodes(prev => {
+        const newCompleted = new Set(prev);
+        level.forEach(nodeId => newCompleted.add(nodeId));
+
+        // Update progress based on completed nodes
+        const progress = Math.round((newCompleted.size / totalNodes) * 100);
+        setExecutionProgress(progress);
+
+        return newCompleted;
+      });
+
+      setExecutingNodes(new Set());
+
+      // Animate connections to next level
+      if (levelIndex < executionOrder.length - 1) {
+        const nextLevel = executionOrder[levelIndex + 1];
+        const activeConns = connections.filter(conn =>
+          level.includes(conn.source) && nextLevel.includes(conn.target)
+        );
+
+        if (activeConns.length > 0) {
+          setActiveConnections(new Set(activeConns.map(c => c.id)));
+
+          // Create particles for each connection
+          const newParticles = activeConns.map((conn, idx) => ({
+            id: `particle-${conn.id}-${Date.now()}-${idx}`,
+            connectionId: conn.id,
+            progress: 0,
+          }));
+
+          setParticles(newParticles);
+
+          // Animate particles
+          const animationDuration = 1000; // 1 second
+          const frameRate = 60;
+          const totalFrames = (animationDuration / 1000) * frameRate;
+
+          for (let frame = 0; frame <= totalFrames; frame++) {
+            await new Promise(resolve => setTimeout(resolve, 1000 / frameRate));
+            const progress = frame / totalFrames;
+            setParticles(newParticles.map(p => ({ ...p, progress })));
+          }
+
+          setParticles([]);
+          setActiveConnections(new Set());
+        }
+
+        // Small delay between levels
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+
+    setIsExecuting(false);
+    addAlert('Workflow execution completed!', AlertVariant.success);
+
+    // Reset completed state after a delay
+    setTimeout(() => {
+      setCompletedNodes(new Set());
+    }, 2000);
+
+    // Start ongoing flow animation
+    startOngoingFlow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes.length, isExecuting, executionOrder, connections, addAlert]);
+
+  // Ref to store timeout ID for cleanup
+  const ongoingFlowTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Start ongoing flow animation between connected nodes
+  const startOngoingFlow = React.useCallback(() => {
+    if (connections.length === 0) return;
+
+    setOngoingFlow(true);
+
+    // Animate ALL connections (removed filter and slice)
+    const animatedConnections = connections;
+
+    let animationFrame = 0;
+    const animate = () => {
+      // Check if animation should continue
+      setOngoingFlow((currentFlow) => {
+        if (!currentFlow) {
+          if (ongoingFlowTimeoutRef.current) {
+            clearTimeout(ongoingFlowTimeoutRef.current);
+            ongoingFlowTimeoutRef.current = null;
+          }
+          return false;
+        }
+
+        const newParticles = animatedConnections.flatMap((conn, idx) => {
+          // Create bidirectional particles with much slower movement
+          // Divide by 200 instead of 100 for half speed
+          const forwardProgress = ((animationFrame + idx * 40) % 200) / 200;
+          const backwardProgress = ((animationFrame + idx * 40 + 100) % 200) / 200;
+
+          return [
+            {
+              id: `flow-forward-${conn.id}-${animationFrame}`,
+              connectionId: conn.id,
+              progress: forwardProgress,
+              direction: 'forward' as const,
+            },
+            {
+              id: `flow-backward-${conn.id}-${animationFrame}`,
+              connectionId: conn.id,
+              progress: backwardProgress,
+              direction: 'backward' as const,
+            },
+          ];
+        });
+
+        setFlowParticles(newParticles);
+        animationFrame++;
+
+        // Schedule next frame with cleanup tracking
+        ongoingFlowTimeoutRef.current = setTimeout(animate, 100); // Even slower: 10 FPS
+        return true;
+      });
+    };
+
+    animate();
+  }, [connections]);
+
+  // Stop ongoing flow
+  const stopOngoingFlow = React.useCallback(() => {
+    setOngoingFlow(false);
+    setFlowParticles([]);
+    // Clear any pending timeout
+    if (ongoingFlowTimeoutRef.current) {
+      clearTimeout(ongoingFlowTimeoutRef.current);
+      ongoingFlowTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Stop ongoing flow when new execution starts
+  React.useEffect(() => {
+    if (isExecuting && ongoingFlow) {
+      stopOngoingFlow();
+    }
+  }, [isExecuting, ongoingFlow, stopOngoingFlow]);
+
+  // Cleanup ongoing flow animation on component unmount
+  React.useEffect(() => {
+    return () => {
+      if (ongoingFlowTimeoutRef.current) {
+        clearTimeout(ongoingFlowTimeoutRef.current);
+        ongoingFlowTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleClear = React.useCallback(() => {
     if (window.confirm('Are you sure you want to clear the canvas?')) {
       setNodes([]);
       setConnections([]);
       setSelectedNode(null);
       saveToHistory([], []);
     }
-  };
+  }, [saveToHistory]);
 
-  const handleNew = () => {
+  const handleNew = React.useCallback(() => {
     handleClear();
-  };
+  }, [handleClear]);
 
-  // Export workflow to JSON file
-  const handleExport = () => {
+  // Handle template selection (memoized with useCallback)
+  const handleSelectTemplate = React.useCallback((template: WorkflowTemplate) => {
     try {
+      // Convert template nodes to NodeData format
+      const templateNodes: NodeData[] = template.nodes.map((node) => ({
+        id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: node.type,
+        label: node.label,
+        position: node.position,
+        size: node.size || { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
+        data: node.data || {},
+      }));
+
+      // Create a mapping from old IDs to new IDs
+      const idMapping: Record<string, string> = {};
+      template.nodes.forEach((oldNode, index) => {
+        idMapping[oldNode.id] = templateNodes[index].id;
+      });
+
+      // Convert template connections with new node IDs
+      const templateConnections: Connection[] = template.connections.map((conn) => ({
+        id: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        source: idMapping[conn.source],
+        target: idMapping[conn.target],
+        sourceConnector: conn.sourceConnector || 'right',
+        targetConnector: conn.targetConnector || 'left',
+      }));
+
+      // Apply template to canvas
+      setNodes(templateNodes);
+      setConnections(templateConnections);
+      saveToHistory(templateNodes, templateConnections);
+
+      addAlert(`Template "${template.name}" loaded successfully!`, AlertVariant.success);
+
+      // Track analytics
+      if (window.mixpanel) {
+        window.mixpanel.track('Template Applied', {
+          templateId: template.id,
+          templateName: template.name,
+          templateCategory: template.category,
+          nodeCount: templateNodes.length,
+          connectionCount: templateConnections.length,
+        });
+      }
+    } catch (error) {
+      console.error('Error applying template:', error);
+      addAlert('Failed to load template. Please try again.', AlertVariant.danger);
+    }
+  }, [saveToHistory, addAlert]);
+
+  // Export workflow to JSON file (memoized with useCallback)
+  const handleExport = React.useCallback(async () => {
+    setIsExporting(true);
+    try {
+      // Simulate processing time for realistic UX
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const workflowData = {
         projectName,
         nodes,
@@ -661,21 +1176,28 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     } catch (error) {
       console.error('Export failed:', error);
       addAlert('Failed to export workflow', AlertVariant.danger);
+    } finally {
+      setIsExporting(false);
     }
-  };
+  }, [projectName, nodes, connections, addAlert]);
 
-  // Import workflow from JSON file
-  const handleImport = () => {
+  // Import workflow from JSON file (memoized with useCallback)
+  const handleImport = React.useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    input.onchange = (e: Event) => {
+    input.onchange = async (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
+      setIsImporting(true);
+
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
+          // Simulate processing time for realistic UX
+          await new Promise(resolve => setTimeout(resolve, 400));
+
           const workflowData = JSON.parse(event.target?.result as string);
           if (workflowData.nodes && workflowData.connections) {
             setNodes(workflowData.nodes);
@@ -688,12 +1210,14 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         } catch (error) {
           console.error('Import failed:', error);
           addAlert('Failed to import workflow', AlertVariant.danger);
+        } finally {
+          setIsImporting(false);
         }
       };
       reader.readAsText(file);
     };
     input.click();
-  };
+  }, [saveToHistory, addAlert]);
 
   // Node action handlers
   const handleNodeAction = (nodeId: string, action: 'launch' | 'chat' | 'reload', e: React.MouseEvent) => {
@@ -769,11 +1293,11 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsNone' }} style={{ height: '100%' }}>
       {/* Header with Toolbar */}
       <FlexItem>
-        <Card>
-          <CardBody>
+        <Card isCompact>
+          <CardBody style={{ padding: '12px 16px' }}>
             <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
               <FlexItem>
-                <Title headingLevel="h1" size="2xl">
+                <Title headingLevel="h1" size="xl">
                   {projectName}
                 </Title>
               </FlexItem>
@@ -787,22 +1311,49 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
+                        <Button
+                          variant="secondary"
+                          icon={<CubesIcon />}
+                          onClick={() => setIsTemplateSelectorOpen(true)}
+                          title="Load a workflow template"
+                        >
+                          Load Template
+                        </Button>
+                      </ToolbarItem>
+                      <ToolbarItem>
                         <Button variant="secondary" icon={<SaveIcon />} onClick={handleSave}>
                           Save
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="secondary" icon={<DownloadIcon />} onClick={handleExport}>
-                          Export
+                        <Button
+                          variant="secondary"
+                          icon={<DownloadIcon />}
+                          onClick={handleExport}
+                          isLoading={isExporting}
+                          isDisabled={isExporting || isImporting || isLoading}
+                        >
+                          {isExporting ? 'Exporting...' : 'Export'}
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="secondary" icon={<UploadIcon />} onClick={handleImport}>
-                          Import
+                        <Button
+                          variant="secondary"
+                          icon={<UploadIcon />}
+                          onClick={handleImport}
+                          isLoading={isImporting}
+                          isDisabled={isImporting || isExporting || isLoading}
+                        >
+                          {isImporting ? 'Importing...' : 'Import'}
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="primary" icon={<PlayIcon />} onClick={handleExecute}>
+                        <Button
+                          variant="primary"
+                          icon={<PlayIcon />}
+                          onClick={handleExecute}
+                          isDisabled={isExecuting || isImporting || isExporting || isLoading}
+                        >
                           Execute
                         </Button>
                       </ToolbarItem>
@@ -829,6 +1380,38 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           title={gridEnabled ? 'Disable grid' : 'Enable grid'}
                         >
                           Grid
+                        </Button>
+                      </ToolbarItem>
+                      <ToolbarItem>
+                        <Button
+                          variant="link"
+                          icon={<SearchPlusIcon />}
+                          onClick={handleZoomIn}
+                          isDisabled={zoom >= MAX_ZOOM}
+                          title="Zoom in"
+                        >
+                          Zoom In
+                        </Button>
+                      </ToolbarItem>
+                      <ToolbarItem>
+                        <Button
+                          variant="link"
+                          icon={<SearchMinusIcon />}
+                          onClick={handleZoomOut}
+                          isDisabled={zoom <= MIN_ZOOM}
+                          title="Zoom out"
+                        >
+                          Zoom Out
+                        </Button>
+                      </ToolbarItem>
+                      <ToolbarItem>
+                        <Button
+                          variant="link"
+                          onClick={handleResetZoom}
+                          isDisabled={zoom === 1 && pan.x === 0 && pan.y === 0}
+                          title="Reset zoom"
+                        >
+                          Reset
                         </Button>
                       </ToolbarItem>
                     </ToolbarGroup>
@@ -984,12 +1567,28 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                   onDrop={handleCanvasDrop}
                   onDragOver={handleCanvasDragOver}
                   onClick={(e) => handleCanvasClick(e)}
+                  onMouseDown={handleCanvasPanStart}
                   onMouseMove={handleMouseMove}
                   onMouseUp={() => {
                     handleNodeDragEnd();
                     handleResizeEnd();
+                    handleCanvasPanEnd();
                   }}
+                  onMouseLeave={handleCanvasPanEnd}
+                  onWheel={handleWheel}
+                  style={{ cursor: isPanning ? 'grabbing' : spacePressed ? 'grab' : 'default' }}
                 >
+                  <div
+                    className="canvas-content"
+                    style={{
+                      transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
+                      transformOrigin: 'top left',
+                      transition: 'transform 0.3s ease',
+                      width: '100%',
+                      height: '100%',
+                      position: 'relative',
+                    }}
+                  >
         <svg className="connections-layer">
           {/* Render connections */}
           {connections.map((conn) => {
@@ -1000,6 +1599,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             const start = getConnectorPosition(sourceNode, conn.sourceConnector || 'right');
             const end = getConnectorPosition(targetNode, conn.targetConnector || 'left');
             const pathData = getCurvedPath(start, end, conn.sourceConnector, conn.targetConnector);
+            const isActive = activeConnections.has(conn.id);
 
             return (
               <g key={conn.id}>
@@ -1015,11 +1615,170 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                 {/* Visible connection path */}
                 <path
                   d={pathData}
-                  stroke="#6b7280"
-                  strokeWidth="2"
+                  stroke={isActive ? '#3b82f6' : '#6b7280'}
+                  strokeWidth={isActive ? '3' : '2'}
                   fill="none"
-                  markerEnd="url(#arrowhead)"
-                  style={{ pointerEvents: 'none' }}
+                  markerEnd={isActive ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
+                  style={{
+                    pointerEvents: 'none',
+                    transition: 'stroke 0.3s ease, stroke-width 0.3s ease'
+                  }}
+                  className={isActive ? 'connection-active' : ''}
+                />
+              </g>
+            );
+          })}
+
+          {/* Render ongoing flow particles */}
+          {flowParticles.map((particle) => {
+            const conn = connections.find(c => c.id === particle.connectionId);
+            if (!conn) return null;
+
+            const sourceNode = nodes.find((n) => n.id === conn.source);
+            const targetNode = nodes.find((n) => n.id === conn.target);
+            if (!sourceNode || !targetNode) return null;
+
+            const start = getConnectorPosition(sourceNode, conn.sourceConnector || 'right');
+            const end = getConnectorPosition(targetNode, conn.targetConnector || 'left');
+
+            // Calculate point along the curve
+            const t = particle.progress;
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const curveStrength = Math.min(distance / 2, 100);
+
+            // Control points
+            let cp1x = start.x;
+            let cp1y = start.y;
+            let cp2x = end.x;
+            let cp2y = end.y;
+
+            if (conn.sourceConnector === 'right') {
+              cp1x = start.x + curveStrength;
+            } else if (conn.sourceConnector === 'left') {
+              cp1x = start.x - curveStrength;
+            } else if (conn.sourceConnector === 'top') {
+              cp1y = start.y - curveStrength;
+            } else if (conn.sourceConnector === 'bottom') {
+              cp1y = start.y + curveStrength;
+            }
+
+            if (conn.targetConnector === 'right') {
+              cp2x = end.x + curveStrength;
+            } else if (conn.targetConnector === 'left') {
+              cp2x = end.x - curveStrength;
+            } else if (conn.targetConnector === 'top') {
+              cp2y = end.y - curveStrength;
+            } else if (conn.targetConnector === 'bottom') {
+              cp2y = end.y + curveStrength;
+            }
+
+            // Cubic bezier formula
+            const particleX =
+              Math.pow(1 - t, 3) * start.x +
+              3 * Math.pow(1 - t, 2) * t * cp1x +
+              3 * (1 - t) * Math.pow(t, 2) * cp2x +
+              Math.pow(t, 3) * end.x;
+
+            const particleY =
+              Math.pow(1 - t, 3) * start.y +
+              3 * Math.pow(1 - t, 2) * t * cp1y +
+              3 * (1 - t) * Math.pow(t, 2) * cp2y +
+              Math.pow(t, 3) * end.y;
+
+            // Different colors for forward/backward
+            const color = particle.direction === 'forward' ? '#10b981' : '#f59e0b';
+
+            return (
+              <g key={particle.id}>
+                {/* Particle */}
+                <circle
+                  cx={particleX}
+                  cy={particleY}
+                  r="3"
+                  fill={color}
+                  opacity="0.7"
+                />
+              </g>
+            );
+          })}
+
+          {/* Render animated particles */}
+          {particles.map((particle) => {
+            const conn = connections.find(c => c.id === particle.connectionId);
+            if (!conn) return null;
+
+            const sourceNode = nodes.find((n) => n.id === conn.source);
+            const targetNode = nodes.find((n) => n.id === conn.target);
+            if (!sourceNode || !targetNode) return null;
+
+            const start = getConnectorPosition(sourceNode, conn.sourceConnector || 'right');
+            const end = getConnectorPosition(targetNode, conn.targetConnector || 'left');
+
+            // Calculate point along the curve using bezier formula
+            const t = particle.progress;
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const curveStrength = Math.min(distance / 2, 100);
+
+            // Control points
+            let cp1x = start.x;
+            let cp1y = start.y;
+            let cp2x = end.x;
+            let cp2y = end.y;
+
+            if (conn.sourceConnector === 'right') {
+              cp1x = start.x + curveStrength;
+            } else if (conn.sourceConnector === 'left') {
+              cp1x = start.x - curveStrength;
+            } else if (conn.sourceConnector === 'top') {
+              cp1y = start.y - curveStrength;
+            } else if (conn.sourceConnector === 'bottom') {
+              cp1y = start.y + curveStrength;
+            }
+
+            if (conn.targetConnector === 'right') {
+              cp2x = end.x + curveStrength;
+            } else if (conn.targetConnector === 'left') {
+              cp2x = end.x - curveStrength;
+            } else if (conn.targetConnector === 'top') {
+              cp2y = end.y - curveStrength;
+            } else if (conn.targetConnector === 'bottom') {
+              cp2y = end.y + curveStrength;
+            }
+
+            // Cubic bezier formula
+            const particleX =
+              Math.pow(1 - t, 3) * start.x +
+              3 * Math.pow(1 - t, 2) * t * cp1x +
+              3 * (1 - t) * Math.pow(t, 2) * cp2x +
+              Math.pow(t, 3) * end.x;
+
+            const particleY =
+              Math.pow(1 - t, 3) * start.y +
+              3 * Math.pow(1 - t, 2) * t * cp1y +
+              3 * (1 - t) * Math.pow(t, 2) * cp2y +
+              Math.pow(t, 3) * end.y;
+
+            return (
+              <g key={particle.id}>
+                {/* Particle glow effect */}
+                <circle
+                  cx={particleX}
+                  cy={particleY}
+                  r="8"
+                  fill="#3b82f6"
+                  opacity="0.3"
+                />
+                {/* Main particle */}
+                <circle
+                  cx={particleX}
+                  cy={particleY}
+                  r="4"
+                  fill="#3b82f6"
+                  className="flow-particle"
                 />
               </g>
             );
@@ -1036,19 +1795,25 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             />
           )}
 
-          {/* Arrow marker definition */}
+          {/* Arrow marker definitions */}
           <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
               <polygon points="0 0, 10 3, 0 6" fill="#6b7280" />
+            </marker>
+            <marker id="arrowhead-active" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <polygon points="0 0, 10 3, 0 6" fill="#3b82f6" />
             </marker>
           </defs>
         </svg>
 
                   {/* Render nodes */}
-                  {nodes.map((node) => (
+                  {nodes.map((node) => {
+                    const isExecuting = executingNodes.has(node.id);
+                    const isCompleted = completedNodes.has(node.id);
+                    return (
                     <div
                       key={node.id}
-                      className={`workflow-node ${selectedNode === node.id ? 'selected' : ''}`}
+                      className={`workflow-node ${selectedNode === node.id ? 'selected' : ''} ${isExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''}`}
                       style={{
                         left: node.position.x,
                         top: node.position.y,
@@ -1067,13 +1832,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           title="Launch node"
                         >
                           <ExternalLinkAltIcon />
-                        </button>
-                        <button
-                          className="action-bubble chat-bubble"
-                          onClick={(e) => handleNodeAction(node.id, 'chat', e)}
-                          title="Chat with node"
-                        >
-                          <CommentsIcon />
                         </button>
                         <button
                           className="action-bubble reload-bubble"
@@ -1129,13 +1887,42 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                         />
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
 
                   {nodes.length === 0 && (
                     <div className="canvas-empty-state">
                       <p>Drag and drop nodes from the left panel to start building your workflow</p>
                     </div>
                   )}
+
+                  {/* Loading Overlay for Data Operations */}
+                  {(isLoading || isImporting || isExporting) && (
+                    <div className="execution-overlay">
+                      <LoadingSpinner
+                        size="large"
+                        message={
+                          isLoading
+                            ? 'Loading workflow...'
+                            : isImporting
+                            ? 'Importing workflow...'
+                            : 'Exporting workflow...'
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {/* Execution Progress Dialog - Small corner dialog within canvas */}
+                  {isExecuting && (
+                    <ExecutionOverlay
+                      progress={executionProgress}
+                      executingCount={executingNodes.size}
+                      completedCount={completedNodes.size}
+                      totalNodes={nodes.length}
+                      statusMessage={executionStatus}
+                    />
+                  )}
+                  </div>
                 </div>
               </div>
             </DrawerContentBody>
@@ -1177,6 +1964,26 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           </div>
         </Modal>
       )}
+
+      {/* Workflow Minimap */}
+      {nodes.length > 0 && canvasRef.current && (
+        <WorkflowMinimap
+          nodes={nodes}
+          connections={connections}
+          canvasWidth={canvasRef.current.clientWidth}
+          canvasHeight={canvasRef.current.clientHeight}
+          zoom={zoom}
+          pan={pan}
+          onViewportChange={(newPan) => setPan(newPan)}
+        />
+      )}
+
+      {/* Template Selector Modal */}
+      <TemplateSelector
+        isOpen={isTemplateSelectorOpen}
+        onClose={() => setIsTemplateSelectorOpen(false)}
+        onSelectTemplate={handleSelectTemplate}
+      />
 
     </Flex>
   );

@@ -11,9 +11,16 @@
     "build": "webpack --config webpack.prod.js",
     "start": "sirv dist --cors --single --host --port 8080",
     "start:dev": "webpack serve --color --progress --config webpack.dev.js",
+    "server": "node server/server.js",
+    "server:dev": "nodemon server/server.js",
+    "dev": "concurrently \"npm run server:dev\" \"npm run start:dev\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "test:e2e": "cypress run",
+    "test:e2e:headed": "cypress run --headed",
     "eslint": "eslint --ext .tsx,.js ./src/",
     "lint": "npm run eslint",
     "format": "prettier --check --write ./src/**/*.{tsx,ts}",
@@ -21,6 +28,7 @@
     "ci-checks": "npm run type-check && npm run lint && npm run test:coverage",
     "build:bundle-profile": "webpack --config webpack.prod.js --profile --json > stats.json",
     "bundle-profile:analyze": "npm run build:bundle-profile && webpack-bundle-analyzer ./stats.json",
+    "build:analyze": "ANALYZE=true webpack --config webpack.prod.js",
     "clean": "rimraf dist"
   },
   "devDependencies": {
@@ -34,6 +42,7 @@
     "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^7.1.2",
     "css-minimizer-webpack-plugin": "^7.0.0",
+    "cypress": "^15.5.0",
     "dotenv-webpack": "^8.1.0",
     "eslint": "^8.57.1",
     "eslint-plugin-prettier": "^5.2.1",
@@ -74,6 +83,15 @@
     "@patternfly/react-core": "^6.0.0",
     "@patternfly/react-icons": "^6.0.0",
     "@patternfly/react-styles": "^6.0.0",
+    "@types/prismjs": "^1.26.5",
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mixpanel-browser": "^2.55.0",
+    "mongoose": "^8.19.2",
+    "nodemon": "^3.1.10",
+    "prismjs": "^1.30.0",
     "react": "^18",
     "react-dom": "^18",
     "sirv-cli": "^3.0.0",
@@ -94,7 +112,8 @@
     "victory-stack": "^37.3.6",
     "victory-tooltip": "^37.3.6",
     "victory-voronoi-container": "^37.3.6",
-    "victory-zoom-container": "^37.3.6"
+    "victory-zoom-container": "^37.3.6",
+    "zod": "^4.1.12"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

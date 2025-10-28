@@ -306,3 +306,133 @@
 .reload-bubble {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
 }
+
+/* Execution Animations */
+.workflow-node.executing {
+  animation: node-pulse 1.5s ease-in-out infinite;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.workflow-node.completed {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+  animation: node-complete 0.5s ease-out;
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2), 0 8px 16px rgba(0, 0, 0, 0.2);
+  }
+}
+
+@keyframes node-complete {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Connection Animation */
+.connection-active {
+  animation: connection-glow 1s ease-in-out infinite;
+}
+
+@keyframes connection-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.8));
+  }
+}
+
+/* Flow Particle Animation */
+.flow-particle {
+  animation: particle-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes particle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Dark Mode Styles */
+.pf-v6-theme-dark .workflow-container {
+  background: #151515;
+}
+
+.pf-v6-theme-dark .node-panel {
+  background: #1f1f1f;
+  border-right-color: #3f3f3f;
+}
+
+.pf-v6-theme-dark .node-panel-title {
+  color: #e5e7eb;
+}
+
+.pf-v6-theme-dark .node-type {
+  background: #2b2b2b;
+  border-color: #3f3f3f;
+}
+
+.pf-v6-theme-dark .node-type-name {
+  color: #e5e7eb;
+}
+
+.pf-v6-theme-dark .node-type-description {
+  color: #9ca3af;
+}
+
+.pf-v6-theme-dark .workflow-canvas {
+  background-color: #151515;
+  background-image:
+    linear-gradient(#3f3f3f 1px, transparent 1px),
+    linear-gradient(90deg, #3f3f3f 1px, transparent 1px);
+}
+
+.pf-v6-theme-dark .workflow-node {
+  background: #2b2b2b;
+}
+
+.pf-v6-theme-dark .node-body {
+  color: #9ca3af;
+}
+
+.pf-v6-theme-dark .connector {
+  border-color: #2b2b2b;
+}
+
+.pf-v6-theme-dark .canvas-empty-state {
+  color: #6b7280;
+}
+
+.pf-v6-theme-dark .node-panel::-webkit-scrollbar-track {
+  background: #1f1f1f;
+}
+
+.pf-v6-theme-dark .node-panel::-webkit-scrollbar-thumb {
+  background: #3f3f3f;
+}
+
+.pf-v6-theme-dark .node-panel::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+}
+
+.pf-v6-theme-dark .action-bubble {
+  border-color: #2b2b2b;
+}

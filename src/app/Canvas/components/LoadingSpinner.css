@@ -1,0 +1,200 @@
+/* Loading Spinner Container */
+.loading-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+}
+
+/* Spinner Wrapper */
+.loading-spinner {
+  position: relative;
+  display: inline-block;
+}
+
+/* SVG Spinner */
+.spinner-svg {
+  animation: rotate 2s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Spinner Track (Background circle) */
+.spinner-track {
+  stroke: #e5e7eb;
+}
+
+/* Spinner Head (Animated circle) */
+.spinner-head {
+  stroke: #667eea;
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 80, 200;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 80, 200;
+    stroke-dashoffset: -125;
+  }
+}
+
+/* Progress Percentage */
+.spinner-progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner-progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.loading-spinner-large .spinner-progress-text {
+  font-size: 16px;
+}
+
+.loading-spinner-small .spinner-progress-text {
+  font-size: 10px;
+}
+
+/* Loading Message */
+.loading-message {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+  text-align: center;
+  animation: pulse-text 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-text {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Execution Overlay - Small draggable dialog box in top-right corner of canvas */
+.execution-overlay {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 16px 20px;
+  z-index: 100;
+  animation: slideInDown 0.3s ease;
+  min-width: 280px;
+  max-width: 320px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  user-select: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.execution-overlay:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.execution-info {
+  text-align: center;
+}
+
+.execution-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.execution-status {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.execution-stats {
+  display: flex;
+  gap: 16px;
+  justify-content: space-around;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.execution-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.execution-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.execution-stat-label {
+  font-size: 10px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

@@ -109,6 +109,55 @@ module.exports = (env) => {
       filename: '[name].bundle.js',
       path: path.resolve(__dirname, 'dist'),
       publicPath: ASSET_PATH,
+      chunkFilename: '[name].[contenthash].chunk.js',
+    },
+    optimization: {
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          // Vendor bundle for node_modules
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            priority: 10,
+            reuseExistingChunk: true,
+          },
+          // PatternFly bundle
+          patternfly: {
+            test: /[\\/]node_modules[\\/]@patternfly[\\/]/,
+            name: 'patternfly',
+            priority: 20,
+            reuseExistingChunk: true,
+          },
+          // React bundle
+          react: {
+            test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom)[\\/]/,
+            name: 'react',
+            priority: 30,
+            reuseExistingChunk: true,
+          },
+          // Prism.js bundle for syntax highlighting
+          prism: {
+            test: /[\\/]node_modules[\\/]prismjs[\\/]/,
+            name: 'prism',
+            priority: 15,
+            reuseExistingChunk: true,
+          },
+          // Common code shared between routes
+          common: {
+            minChunks: 2,
+            priority: 5,
+            reuseExistingChunk: true,
+            enforce: true,
+          },
+        },
+      },
+      // Runtime chunk for better long-term caching
+      runtimeChunk: {
+        name: 'runtime',
+      },
+      // Module IDs based on content hash for better caching
+      moduleIds: 'deterministic',
     },
     plugins: [
       new HtmlWebpackPlugin({

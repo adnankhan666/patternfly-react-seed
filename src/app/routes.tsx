@@ -1,36 +1,47 @@
 import * as React from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { Dashboard } from '@app/Dashboard/Dashboard';
-import { EnabledApplications } from '@app/Applications/EnabledApplications';
-import { ExploreApplications } from '@app/Applications/ExploreApplications';
-import { Canvas } from '@app/Canvas/Canvas';
-import { MyDSProject1 } from '@app/Canvas/MyDSProject1';
-import { MyDSProject2 } from '@app/Canvas/MyDSProject2';
-import { MyDSProject3 } from '@app/Canvas/MyDSProject3';
-import { DynamicProject } from '@app/Canvas/DynamicProject';
-import { Projects } from '@app/Projects/Projects';
-import { Pipelines } from '@app/Pipelines/Pipelines';
-import { PipelineRuns } from '@app/Pipelines/PipelineRuns';
-import { Experiments } from '@app/Experiments/Experiments';
-import { Artifacts } from '@app/Experiments/Artifacts';
-import { DistributedWorkloads } from '@app/DistributedWorkloads/DistributedWorkloads';
-import { Extensions } from '@app/Extensions/Extensions';
-import { Feast } from '@app/Feast/Feast';
-import { HardwareProfiles } from '@app/HardwareProfiles/HardwareProfiles';
-import { MCPServers } from '@app/MCPServers/MCPServers';
-import { ModelCatalog } from '@app/ModelCatalog/ModelCatalog';
-import { ModelRegistry } from '@app/ModelRegistry/ModelRegistry';
-import { ModelServing } from '@app/ModelServing/ModelServing';
-import { Notebooks } from '@app/Notebooks/Notebooks';
-import { Resources } from '@app/Resources/Resources';
-import { Training } from '@app/Training/Training';
-import { Tuning } from '@app/Tuning/Tuning';
-import { NotebookImages } from '@app/Settings/NotebookImages';
-import { ClusterSettings } from '@app/Settings/ClusterSettings';
-import { AcceleratorProfiles } from '@app/Settings/AcceleratorProfiles';
-import { ServingRuntimes } from '@app/Settings/ServingRuntimes';
-import { UserManagement } from '@app/Settings/UserManagement';
-import { NotFound } from '@app/NotFound/NotFound';
+import { ErrorBoundary } from '@app/ErrorBoundary';
+import { Spinner } from '@patternfly/react-core';
+
+// Loading component
+const Loading = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <Spinner size="xl" aria-label="Loading page content" />
+  </div>
+);
+
+// Lazy load all route components
+const Dashboard = React.lazy(() => import('@app/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+const EnabledApplications = React.lazy(() => import('@app/Applications/EnabledApplications').then(m => ({ default: m.EnabledApplications })));
+const ExploreApplications = React.lazy(() => import('@app/Applications/ExploreApplications').then(m => ({ default: m.ExploreApplications })));
+const Canvas = React.lazy(() => import('@app/Canvas/Canvas').then(m => ({ default: m.Canvas })));
+const MyDSProject1 = React.lazy(() => import('@app/Canvas/MyDSProject1').then(m => ({ default: m.MyDSProject1 })));
+const MyDSProject2 = React.lazy(() => import('@app/Canvas/MyDSProject2').then(m => ({ default: m.MyDSProject2 })));
+const MyDSProject3 = React.lazy(() => import('@app/Canvas/MyDSProject3').then(m => ({ default: m.MyDSProject3 })));
+const DynamicProject = React.lazy(() => import('@app/Canvas/DynamicProject').then(m => ({ default: m.DynamicProject })));
+const Projects = React.lazy(() => import('@app/Projects/Projects').then(m => ({ default: m.Projects })));
+const Pipelines = React.lazy(() => import('@app/Pipelines/Pipelines').then(m => ({ default: m.Pipelines })));
+const PipelineRuns = React.lazy(() => import('@app/Pipelines/PipelineRuns').then(m => ({ default: m.PipelineRuns })));
+const Experiments = React.lazy(() => import('@app/Experiments/Experiments').then(m => ({ default: m.Experiments })));
+const Artifacts = React.lazy(() => import('@app/Experiments/Artifacts').then(m => ({ default: m.Artifacts })));
+const DistributedWorkloads = React.lazy(() => import('@app/DistributedWorkloads/DistributedWorkloads').then(m => ({ default: m.DistributedWorkloads })));
+const Extensions = React.lazy(() => import('@app/Extensions/Extensions').then(m => ({ default: m.Extensions })));
+const Feast = React.lazy(() => import('@app/Feast/Feast').then(m => ({ default: m.Feast })));
+const HardwareProfiles = React.lazy(() => import('@app/HardwareProfiles/HardwareProfiles').then(m => ({ default: m.HardwareProfiles })));
+const MCPServers = React.lazy(() => import('@app/MCPServers/MCPServers').then(m => ({ default: m.MCPServers })));
+const ModelCatalog = React.lazy(() => import('@app/ModelCatalog/ModelCatalog').then(m => ({ default: m.ModelCatalog })));
+const ModelRegistry = React.lazy(() => import('@app/ModelRegistry/ModelRegistry').then(m => ({ default: m.ModelRegistry })));
+const ModelServing = React.lazy(() => import('@app/ModelServing/ModelServing').then(m => ({ default: m.ModelServing })));
+const Notebooks = React.lazy(() => import('@app/Notebooks/Notebooks').then(m => ({ default: m.Notebooks })));
+const Resources = React.lazy(() => import('@app/Resources/Resources').then(m => ({ default: m.Resources })));
+const Training = React.lazy(() => import('@app/Training/Training').then(m => ({ default: m.Training })));
+const Tuning = React.lazy(() => import('@app/Tuning/Tuning').then(m => ({ default: m.Tuning })));
+const NotebookImages = React.lazy(() => import('@app/Settings/NotebookImages').then(m => ({ default: m.NotebookImages })));
+const ClusterSettings = React.lazy(() => import('@app/Settings/ClusterSettings').then(m => ({ default: m.ClusterSettings })));
+const AcceleratorProfiles = React.lazy(() => import('@app/Settings/AcceleratorProfiles').then(m => ({ default: m.AcceleratorProfiles })));
+const ServingRuntimes = React.lazy(() => import('@app/Settings/ServingRuntimes').then(m => ({ default: m.ServingRuntimes })));
+const UserManagement = React.lazy(() => import('@app/Settings/UserManagement').then(m => ({ default: m.UserManagement })));
+const NotFound = React.lazy(() => import('@app/NotFound/NotFound').then(m => ({ default: m.NotFound })));
 
 export interface IAppRoute {
   label?: string; // Excluding the label will exclude the route from the nav sidebar in AppLayout
@@ -239,12 +250,24 @@ const flattenedRoutes: IAppRoute[] = routes.reduce(
 );
 
 const AppRoutes = (): React.ReactElement => (
-  <Routes>
-    {flattenedRoutes.map(({ path, element }, idx) => (
-      <Route path={path} element={element} key={idx} />
-    ))}
-    <Route element={<NotFound />} />
-  </Routes>
+  <ErrorBoundary>
+    <React.Suspense fallback={<Loading />}>
+      <Routes>
+        {flattenedRoutes.map(({ path, element }, idx) => (
+          <Route
+            path={path}
+            element={
+              <ErrorBoundary>
+                <React.Suspense fallback={<Loading />}>{element}</React.Suspense>
+              </ErrorBoundary>
+            }
+            key={idx}
+          />
+        ))}
+        <Route element={<NotFound />} />
+      </Routes>
+    </React.Suspense>
+  </ErrorBoundary>
 );
 
 export { AppRoutes, routes };

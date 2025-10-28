@@ -10,3 +10,10 @@ declare module '*.m4a';
 declare module '*.rdf';
 declare module '*.ttl';
 declare module '*.pdf';
+
+interface Window {
+  mixpanel?: {
+    track: (event: string, properties?: Record<string, unknown>) => void;
+    init: (token: string) => void;
+  };
+}

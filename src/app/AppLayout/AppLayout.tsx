@@ -6,6 +6,7 @@ import {
   MastheadBrand,
   MastheadLogo,
   MastheadMain,
+  MastheadContent,
   MastheadToggle,
   Nav,
   NavExpandable,
@@ -15,10 +16,15 @@ import {
   PageSidebar,
   PageSidebarBody,
   SkipToContent,
+  Toolbar,
+  ToolbarContent,
+  ToolbarGroup,
+  ToolbarItem,
 } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
 import { useNavigationData, isNavDataGroup, NavDataItem, NavDataHref, NavDataGroup } from '@app/navData';
 import { ChatBot } from '../ChatBot/ChatBot';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { allData } from '../data';
 
 interface IAppLayout {
@@ -44,8 +50,8 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
               <title>Open Data Hub</title>
               <g transform="translate(-1.3561905e-7,-283.77084)">
                 <g transform="matrix(4.0724844,0,0,4.0724844,-430.01386,195.33008)">
-                  <g style={{ fill: '#000000', fillOpacity: 1 }}>
-                    <text x="111" y="23.5" style={{ fontSize: '1.27px', fontFamily: 'Montserrat', fontWeight: 600, fill: '#000000' }}>
+                  <g style={{ fill: 'currentColor', fillOpacity: 1 }}>
+                    <text x="111" y="23.5" style={{ fontSize: '1.27px', fontFamily: 'Montserrat', fontWeight: 600, fill: 'currentColor' }}>
                       OPEN DATA HUB
                     </text>
                   </g>
@@ -81,6 +87,17 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
           </MastheadLogo>
         </MastheadBrand>
       </MastheadMain>
+      <MastheadContent>
+        <Toolbar id="masthead-toolbar" isFullHeight isStatic>
+          <ToolbarContent>
+            <ToolbarGroup>
+              <ToolbarItem align={{ default: 'alignEnd' }}>
+                <ThemeToggle variant="plain" />
+              </ToolbarItem>
+            </ToolbarGroup>
+          </ToolbarContent>
+        </Toolbar>
+      </MastheadContent>
     </Masthead>
   );
 

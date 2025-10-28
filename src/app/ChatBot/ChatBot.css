@@ -17,6 +17,11 @@
   transition: right 0.3s ease;
 }
 
+/* Dark mode: subtle variation for chat bubble */
+.pf-v6-theme-dark .chat-bubble {
+  background: linear-gradient(135deg, #7c91f7 0%, #8b5fc7 100%);
+}
+
 /* Move chatbot left when drawer is open */
 body.drawer-expanded .chat-bubble {
   right: 424px; /* 400px drawer + 24px margin */
@@ -70,6 +75,11 @@ body.drawer-expanded .chat-bubble {
   z-index: 1000;
   animation: slideUp 0.3s ease;
   transition: right 0.3s ease;
+}
+
+.pf-v6-theme-dark .chat-window {
+  background: #1f1f1f;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* Move chat window left when drawer is open */
@@ -157,6 +167,10 @@ body.drawer-expanded .chat-window {
   background: #f9fafb;
 }
 
+.pf-v6-theme-dark .chat-messages {
+  background: #151515;
+}
+
 .chat-messages::-webkit-scrollbar {
   width: 6px;
 }
@@ -221,6 +235,27 @@ body.drawer-expanded .chat-window {
   border-bottom-left-radius: 4px;
 }
 
+.pf-v6-theme-dark .bot-message .message-content {
+  background: #2b2b2b;
+  color: #e5e7eb;
+  border-color: #3f3f3f;
+}
+
+/* Code block styling in messages */
+.bot-message .message-content .code-block-container {
+  margin: 8px 0;
+  max-width: 100%;
+}
+
+.bot-message .message-content pre {
+  margin: 0;
+  font-size: 13px;
+}
+
+.bot-message .message-content code {
+  font-family: 'Courier New', monospace;
+}
+
 .message-time {
   font-size: 11px;
   color: #9ca3af;
@@ -232,7 +267,15 @@ body.drawer-expanded .chat-window {
   text-align: right;
 }
 
-/* Typing Indicator */
+/* Skeleton Message */
+.skeleton-message {
+  padding: 14px 16px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+}
+
+/* Typing Indicator (Fallback) */
 .typing-indicator {
   display: flex;
   gap: 4px;
@@ -276,6 +319,11 @@ body.drawer-expanded .chat-window {
   border-radius: 0 0 16px 16px;
 }
 
+.pf-v6-theme-dark .chat-input-container {
+  background: #1f1f1f;
+  border-top-color: #3f3f3f;
+}
+
 .chat-input {
   flex: 1;
   padding: 10px 14px;
@@ -286,8 +334,18 @@ body.drawer-expanded .chat-window {
   transition: border-color 0.2s;
 }
 
+.pf-v6-theme-dark .chat-input {
+  background: #2b2b2b;
+  border-color: #3f3f3f;
+  color: #e5e7eb;
+}
+
 .chat-input:focus {
   border-color: #667eea;
+}
+
+.pf-v6-theme-dark .chat-input:focus {
+  border-color: #7c91f7;
 }
 
 .chat-send {

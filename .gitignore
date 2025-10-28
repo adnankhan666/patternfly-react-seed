@@ -3,9 +3,13 @@ dist
 yarn-error.log
 yarn.lock
 stats.json
+bundle-stats.json
 coverage
 storybook-static
 .DS_Store
 .idea
 .env
 .history
+cypress/videos
+cypress/screenshots
+cypress/downloads
