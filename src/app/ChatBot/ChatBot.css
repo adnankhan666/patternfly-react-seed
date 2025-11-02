@@ -62,11 +62,12 @@ body.drawer-expanded .chat-bubble {
 
 /* Chat Window */
 .chat-window {
-  position: fixed;
-  bottom: 100px;
+  position: absolute;
+  top: 24px;
   right: 24px;
-  width: 380px;
-  height: 550px;
+  bottom: 100px;
+  width: 400px;
+  height: calc(100% - 124px);
   background: white;
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);

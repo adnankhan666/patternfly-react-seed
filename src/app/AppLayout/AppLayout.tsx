@@ -26,13 +26,14 @@ import { useNavigationData, isNavDataGroup, NavDataItem, NavDataHref, NavDataGro
 import { ChatBot } from '../ChatBot/ChatBot';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { allData } from '../data';
+import { useSidebar } from '../contexts/SidebarContext';
 
 interface IAppLayout {
   children: React.ReactNode;
 }
 
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const { sidebarOpen, toggleSidebar } = useSidebar();
   const masthead = (
     <Masthead>
       <MastheadMain>
@@ -40,7 +41,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
           <Button
             icon={<BarsIcon />}
             variant="plain"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={toggleSidebar}
             aria-label="Global navigation"
           />
         </MastheadToggle>

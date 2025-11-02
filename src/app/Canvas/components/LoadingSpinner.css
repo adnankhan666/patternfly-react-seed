@@ -99,10 +99,10 @@
   }
 }
 
-/* Execution Overlay - Small draggable dialog box in top-right corner of canvas */
+/* Execution Overlay - Small draggable dialog box fixed within canvas area, unaffected by zoom/pan */
 .execution-overlay {
-  position: absolute;
-  top: 24px;
+  position: fixed;
+  top: 250px;
   right: 24px;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(8px);
@@ -116,6 +116,7 @@
   border: 1px solid rgba(0, 0, 0, 0.1);
   user-select: none;
   transition: box-shadow 0.2s ease;
+  pointer-events: auto;
 }
 
 .execution-overlay:hover {

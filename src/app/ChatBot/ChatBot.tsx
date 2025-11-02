@@ -20,7 +20,7 @@ const ChatBot: React.FunctionComponent<ChatBotProps> = ({ workflowContext }) => 
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m Gemini, your AI assistant. How can I help you today?',
+      text: 'Hello! I\'m Red AI, your AI assistant. How can I help you today?',
       sender: 'bot',
       timestamp: new Date(),
     },
@@ -141,9 +141,9 @@ const ChatBot: React.FunctionComponent<ChatBotProps> = ({ workflowContext }) => 
         <div className="chat-window" role="dialog" aria-labelledby="chat-title" aria-modal="false">
           <div className="chat-header">
             <div className="chat-header-content">
-              <div className="chat-avatar" aria-hidden="true">G</div>
+              <div className="chat-avatar" aria-hidden="true">R</div>
               <div>
-                <div className="chat-title" id="chat-title">Gemini AI</div>
+                <div className="chat-title" id="chat-title">Red AI</div>
                 <div className="chat-status" role="status" aria-live="polite">Online</div>
               </div>
             </div>
@@ -164,7 +164,7 @@ const ChatBot: React.FunctionComponent<ChatBotProps> = ({ workflowContext }) => 
                 key={message.id}
                 className={`chat-message ${message.sender === 'user' ? 'user-message' : 'bot-message'}`}
                 role="article"
-                aria-label={`${message.sender === 'user' ? 'You' : 'Gemini AI'} at ${message.timestamp.toLocaleTimeString()}`}
+                aria-label={`${message.sender === 'user' ? 'You' : 'Red AI'} at ${message.timestamp.toLocaleTimeString()}`}
               >
                 <div className="message-content">
                   {message.sender === 'bot' ? renderMessageParts(message.text) : message.text}

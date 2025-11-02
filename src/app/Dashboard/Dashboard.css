@@ -1,0 +1,217 @@
+/* Splash Screen Overlay */
+.splash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2rem;
+  z-index: 10000;
+  animation: fadeOut 5s ease-in-out forwards;
+}
+
+/* Splash Content Container */
+.splash-content {
+  text-align: center;
+  position: relative;
+}
+
+/* Splash Text Wrapper for multiple DropText components */
+.splash-text-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Splash Text */
+.splash-text {
+  font-size: 4rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+}
+
+/* Transition Text - "Let's get started" */
+.splash-transition-text {
+  font-size: 2rem;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  animation: fadeInTransition 1s ease-in-out 3.2s forwards;
+}
+
+/* Dust Container */
+.dust-container {
+  position: absolute;
+  bottom: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100px;
+  pointer-events: none;
+}
+
+/* Dust Particles */
+.dust-particle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%);
+  border-radius: 50%;
+  opacity: 0;
+  left: 50%;
+  bottom: 0;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Individual dust particle animations - EXPLOSIVE burst on impact (100ms initial delay + 350ms fall = 450ms) */
+.dust-1 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
+.dust-2 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
+.dust-3 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
+.dust-4 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
+.dust-5 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
+.dust-6 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
+.dust-7 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
+.dust-8 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
+.dust-9 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
+.dust-10 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
+.dust-11 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
+.dust-12 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
+
+/* Dust explosion animation - VIOLENT instant burst */
+@keyframes dustExplosion {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(var(--dust-x, 0) * 300px),
+      calc(var(--dust-y, 0) * -150px)
+    ) scale(4);
+  }
+}
+
+/* Old dust spread animation - kept for reference */
+@keyframes dustSpread {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(var(--dust-x, 0) * 250px),
+      calc(var(--dust-y, 0) * -120px)
+    ) scale(3);
+  }
+}
+
+/* Assign random directions to each particle */
+.dust-1 { --dust-x: -1.2; --dust-y: 0.8; }
+.dust-2 { --dust-x: 1.2; --dust-y: 0.9; }
+.dust-3 { --dust-x: -0.8; --dust-y: 1.1; }
+.dust-4 { --dust-x: 0.9; --dust-y: 0.7; }
+.dust-5 { --dust-x: -1.5; --dust-y: 0.6; }
+.dust-6 { --dust-x: 1.4; --dust-y: 0.85; }
+.dust-7 { --dust-x: -0.5; --dust-y: 1.2; }
+.dust-8 { --dust-x: 0.6; --dust-y: 1.0; }
+.dust-9 { --dust-x: -1.0; --dust-y: 0.9; }
+.dust-10 { --dust-x: 1.1; --dust-y: 0.75; }
+.dust-11 { --dust-x: -0.3; --dust-y: 1.15; }
+.dust-12 { --dust-x: 0.4; --dust-y: 0.95; }
+
+/* Drop-Thud Animation - Dramatic drop with multiple bounces */
+@keyframes dropThud {
+  0% {
+    transform: translateY(-150vh) scale(0.5) rotate(-8deg);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(0) scale(1.2);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-40px) scale(0.95);
+  }
+  80% {
+    transform: translateY(0) scale(1.1);
+  }
+  85% {
+    transform: translateY(-20px) scale(0.98);
+  }
+  90% {
+    transform: translateY(0) scale(1.05);
+  }
+  95% {
+    transform: translateY(-8px) scale(0.99);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Fade Out Animation */
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Fade in transition for "Let's get started" */
+@keyframes fadeInTransition {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .splash-text {
+    font-size: 2.5rem;
+  }
+
+  .splash-transition-text {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .splash-text {
+    font-size: 2rem;
+  }
+
+  .splash-transition-text {
+    font-size: 1.25rem;
+  }
+}

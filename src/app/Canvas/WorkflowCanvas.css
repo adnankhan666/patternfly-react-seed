@@ -68,7 +68,7 @@
 }
 
 .workflow-canvas.no-grid {
-  background-image: none;
+  background-image: none !important;
 }
 
 .connections-layer {
@@ -403,6 +403,10 @@
   background-image:
     linear-gradient(#3f3f3f 1px, transparent 1px),
     linear-gradient(90deg, #3f3f3f 1px, transparent 1px);
+}
+
+.pf-v6-theme-dark .workflow-canvas.no-grid {
+  background-image: none !important;
 }
 
 .pf-v6-theme-dark .workflow-node {

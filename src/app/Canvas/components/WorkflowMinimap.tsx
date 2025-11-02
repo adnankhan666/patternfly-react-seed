@@ -157,15 +157,42 @@ export const WorkflowMinimap: React.FunctionComponent<WorkflowMinimapProps> = Re
       style={{
         position: 'fixed',
         bottom: '20px',
-        left: '20px',
+        left: '300px', // Position after the node panel (280px width + 20px margin)
         zIndex: 1000,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
         border: '2px solid #d1d5db',
         borderRadius: '8px',
-        padding: '8px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        padding: '12px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        pointerEvents: 'auto',
       }}
     >
+      {/* Minimap Title and Stats */}
+      <div style={{
+        fontSize: '11px',
+        fontWeight: 600,
+        color: '#374151',
+        marginBottom: '4px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <span>Workflow Overview</span>
+      </div>
+      <div style={{
+        fontSize: '10px',
+        color: '#6b7280',
+        marginBottom: '8px',
+        display: 'flex',
+        gap: '8px',
+      }}>
+        <span>{nodes.length} nodes</span>
+        <span>•</span>
+        <span>{connections.length} edges</span>
+        <span>•</span>
+        <span>{Math.round(zoom * 100)}% zoom</span>
+      </div>
+
       <svg
         ref={minimapRef}
         width={MINIMAP_WIDTH}

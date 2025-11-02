@@ -1,0 +1,44 @@
+.drop-text-container {
+  position: relative;
+  display: inline-block;
+  overflow: visible;
+}
+
+.thud-container {
+  display: inline-block;
+  position: relative;
+}
+
+.drop-text {
+  display: inline-block;
+  font-size: 5rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+/* Impact flash effect */
+.impact-flash {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.4) 40%, transparent 70%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.smoke {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.5) 30%, transparent 70%);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.5);
+  pointer-events: none;
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.7);
+}

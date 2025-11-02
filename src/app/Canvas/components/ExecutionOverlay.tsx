@@ -45,10 +45,30 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
   }, [position]);
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (isDragging) {
+    if (isDragging && overlayRef.current) {
+      const overlayRect = overlayRef.current.getBoundingClientRect();
+
+      // Calculate new position
+      let newX = e.clientX - dragStart.x;
+      let newY = e.clientY - dragStart.y;
+
+      // Define boundaries
+      // Top boundary: below the header/toolbar and tabs area (approximately 250px from top)
+      const minY = 250;
+      // Left boundary: after the node panel (280px width) plus padding
+      const minX = 300;
+      // Right boundary: keep within viewport minus overlay width and some padding
+      const maxX = window.innerWidth - overlayRect.width - 20;
+      // Bottom boundary: keep within viewport minus overlay height and some padding
+      const maxY = window.innerHeight - overlayRect.height - 20;
+
+      // Constrain position within boundaries
+      newX = Math.max(minX, Math.min(newX, maxX));
+      newY = Math.max(minY, Math.min(newY, maxY));
+
       setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
+        x: newX,
+        y: newY,
       });
     }
   }, [isDragging, dragStart]);
@@ -66,6 +86,7 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
+    return undefined;
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   return (

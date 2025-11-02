@@ -31,6 +31,11 @@ import {
   Modal,
   ModalVariant,
   ModalBody,
+  Dropdown,
+  DropdownList,
+  DropdownItem,
+  MenuToggle,
+  MenuToggleElement,
 } from '@patternfly/react-core';
 import {
   PlayIcon,
@@ -46,6 +51,8 @@ import {
   SearchPlusIcon,
   SearchMinusIcon,
   CubesIcon,
+  TimesIcon,
+  MapIcon,
 } from '@patternfly/react-icons';
 import { Alert, AlertGroup, AlertActionCloseButton, AlertVariant } from '@patternfly/react-core';
 import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition } from './types';
@@ -96,7 +103,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const [copiedNodes, setCopiedNodes] = React.useState<NodeData[]>([]);
   const [gridEnabled, setGridEnabled] = React.useState(GRID_ENABLED_DEFAULT);
   const [connectionToDelete, setConnectionToDelete] = React.useState<string | null>(null);
-  const [nodeToDelete, setNodeToDelete] = React.useState<string | null>(null);
   const [draggedNode, setDraggedNode] = React.useState<NodeData | null>(null);
   const [isDrawerExpanded, setIsDrawerExpanded] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string | number>(0);
@@ -130,7 +136,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     connectionId: string;
     progress: number;
   }>>([]);
-  const [ongoingFlow, setOngoingFlow] = React.useState(false);
   const [flowParticles, setFlowParticles] = React.useState<Array<{
     id: string;
     connectionId: string;
@@ -165,6 +170,53 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, []);
+
+  // Fit all nodes to view - center and zoom to show all nodes
+  const fitToView = React.useCallback(() => {
+    if (!canvasRef.current || nodes.length === 0) return;
+
+    // Calculate bounding box of all nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    nodes.forEach(node => {
+      const nodeWidth = node.size?.width || DEFAULT_NODE_WIDTH;
+      const nodeHeight = node.size?.height || DEFAULT_NODE_HEIGHT;
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+      maxX = Math.max(maxX, node.position.x + nodeWidth);
+      maxY = Math.max(maxY, node.position.y + nodeHeight);
+    });
+
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    const contentCenterX = minX + contentWidth / 2;
+    const contentCenterY = minY + contentHeight / 2;
+
+    // Get canvas dimensions
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const canvasWidth = canvasRect.width;
+    const canvasHeight = canvasRect.height;
+
+    // Calculate zoom to fit all nodes with padding
+    const padding = 100;
+    const zoomX = (canvasWidth - padding * 2) / contentWidth;
+    const zoomY = (canvasHeight - padding * 2) / contentHeight;
+    const newZoom = Math.min(zoomX, zoomY, 1, MAX_ZOOM); // Don't zoom in beyond 100%
+
+    // Calculate pan to center the content
+    // The transform is: scale(zoom) translate(pan.x, pan.y)
+    // So pan is applied AFTER zoom, meaning pan values are in scaled space
+    const canvasCenterX = canvasWidth / 2;
+    const canvasCenterY = canvasHeight / 2;
+
+    const newPan = {
+      x: (canvasCenterX / newZoom) - contentCenterX,
+      y: (canvasCenterY / newZoom) - contentCenterY,
+    };
+
+    setZoom(Math.max(newZoom, MIN_ZOOM));
+    setPan(newPan);
+  }, [nodes, MIN_ZOOM, MAX_ZOOM]);
 
   // Pan handlers for canvas dragging (memoized with useCallback)
   const handleCanvasPanStart = React.useCallback((e: React.MouseEvent) => {
@@ -273,6 +325,44 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const canUndo = React.useMemo(() => historyIndex > 0, [historyIndex]);
   const canRedo = React.useMemo(() => historyIndex < history.length - 1, [historyIndex, history.length]);
 
+  // Load available projects from localStorage
+  React.useEffect(() => {
+    const loadProjects = () => {
+      try {
+        // Scan localStorage for all workflow-* keys
+        const projects: string[] = [];
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+
+          if (key && key.startsWith('workflow-')) {
+            // Extract project name from key (remove 'workflow-' prefix)
+            const extractedProjectName = key.substring('workflow-'.length);
+
+            if (extractedProjectName && !projects.includes(extractedProjectName)) {
+              projects.push(extractedProjectName);
+            }
+          }
+        }
+
+        // Always include the current project
+        if (!projects.includes(projectName)) {
+          projects.push(projectName);
+        }
+
+        // Sort projects alphabetically
+        projects.sort();
+
+        setAvailableProjects(projects);
+      } catch (error) {
+        console.error('Error loading projects:', error);
+        setAvailableProjects([projectName]);
+      }
+    };
+
+    loadProjects();
+  }, [projectName]);
+
   // Load workflow from localStorage on mount
   React.useEffect(() => {
     const loadWorkflow = async () => {
@@ -288,7 +378,13 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             setNodes(workflowData.nodes);
             setConnections(workflowData.connections);
             saveToHistory(workflowData.nodes, workflowData.connections);
-            console.log('Workflow loaded from localStorage:', workflowData);
+
+            // Fit nodes to view after loading (with a delay to ensure state is updated and canvas is ready)
+            setTimeout(() => {
+              if (workflowData.nodes.length > 0 && canvasRef.current) {
+                fitToView();
+              }
+            }, 600);
           }
         }
       } catch (error) {
@@ -423,7 +519,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             timestamp: new Date().toISOString(),
           };
           localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
-          console.log('Auto-saved workflow at', new Date().toLocaleTimeString());
         } catch (error) {
           console.error('Auto-save failed:', error);
         }
@@ -790,14 +885,150 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
   const toggleGrid = React.useCallback(() => {
     setGridEnabled(!gridEnabled);
-    addAlert(gridEnabled ? 'Grid disabled' : 'Grid enabled', AlertVariant.info);
-  }, [gridEnabled, addAlert]);
+  }, [gridEnabled]);
 
   // Track current workflow ID for database operations
   const [currentWorkflowId, setCurrentWorkflowId] = React.useState<string | null>(null);
 
   // Template selector state
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = React.useState(false);
+
+  // Workflow deletion state
+  const [workflowToDelete, setWorkflowToDelete] = React.useState<number | null>(null);
+
+  // Project selector dropdown state
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = React.useState(false);
+  const [availableProjects, setAvailableProjects] = React.useState<string[]>([]);
+
+  // Minimap visibility state
+  const [isMinimapOpen, setIsMinimapOpen] = React.useState(false);
+
+  // Workflow tabs state
+  const [activeWorkflowTab, setActiveWorkflowTab] = React.useState<string | number>(0);
+  const [projectWorkflows, setProjectWorkflows] = React.useState<Array<{
+    id: string;
+    name: string;
+    nodes: NodeData[];
+    connections: Connection[];
+  }>>([
+    {
+      id: 'workflow-1',
+      name: 'Main Workflow',
+      nodes: [],
+      connections: [],
+    },
+  ]);
+
+  // Handle workflow tab switching
+  const handleWorkflowTabSwitch = React.useCallback((event: React.MouseEvent<any> | React.KeyboardEvent | MouseEvent, tabIndex: string | number) => {
+    const currentWorkflow = projectWorkflows[activeWorkflowTab as number];
+    if (currentWorkflow) {
+      // Save current workflow's state
+      const updatedWorkflows = [...projectWorkflows];
+      updatedWorkflows[activeWorkflowTab as number] = {
+        ...currentWorkflow,
+        nodes,
+        connections,
+      };
+      setProjectWorkflows(updatedWorkflows);
+    }
+
+    // Switch to new workflow
+    setActiveWorkflowTab(tabIndex);
+    const newWorkflow = projectWorkflows[tabIndex as number];
+    if (newWorkflow) {
+      setNodes(newWorkflow.nodes);
+      setConnections(newWorkflow.connections);
+      saveToHistory(newWorkflow.nodes, newWorkflow.connections);
+
+      // Fit to view after switching workflows
+      setTimeout(() => {
+        if (newWorkflow.nodes.length > 0) {
+          fitToView();
+        }
+      }, 100);
+    }
+  }, [activeWorkflowTab, projectWorkflows, nodes, connections, saveToHistory, fitToView]);
+
+  // Add new workflow tab
+  const handleAddWorkflow = React.useCallback(() => {
+    const newWorkflowId = `workflow-${Date.now()}`;
+    const newWorkflow = {
+      id: newWorkflowId,
+      name: `Workflow ${projectWorkflows.length + 1}`,
+      nodes: [],
+      connections: [],
+    };
+
+    // Save current workflow state before switching
+    const currentWorkflow = projectWorkflows[activeWorkflowTab as number];
+    if (currentWorkflow) {
+      const updatedWorkflows = [...projectWorkflows];
+      updatedWorkflows[activeWorkflowTab as number] = {
+        ...currentWorkflow,
+        nodes,
+        connections,
+      };
+      setProjectWorkflows([...updatedWorkflows, newWorkflow]);
+    } else {
+      setProjectWorkflows([...projectWorkflows, newWorkflow]);
+    }
+
+    // Switch to new workflow
+    setActiveWorkflowTab(projectWorkflows.length);
+    setNodes([]);
+    setConnections([]);
+    saveToHistory([], []);
+    addAlert(`Created new workflow: ${newWorkflow.name}`, AlertVariant.success);
+  }, [projectWorkflows, activeWorkflowTab, nodes, connections, saveToHistory, addAlert]);
+
+  // Delete workflow tab
+  const handleDeleteWorkflow = React.useCallback((workflowIndex: number) => {
+    setWorkflowToDelete(workflowIndex);
+  }, []);
+
+  const confirmDeleteWorkflow = React.useCallback(() => {
+    if (workflowToDelete === null) return;
+
+    // Cannot delete if it's the last workflow
+    if (projectWorkflows.length === 1) {
+      addAlert('Cannot delete the last workflow', AlertVariant.warning);
+      setWorkflowToDelete(null);
+      return;
+    }
+
+    const deletedWorkflowName = projectWorkflows[workflowToDelete].name;
+    const updatedWorkflows = projectWorkflows.filter((_, index) => index !== workflowToDelete);
+    setProjectWorkflows(updatedWorkflows);
+
+    // Adjust active tab if necessary
+    if (activeWorkflowTab === workflowToDelete) {
+      // If deleting active tab, switch to previous tab or first tab
+      const newActiveTab = workflowToDelete > 0 ? workflowToDelete - 1 : 0;
+      setActiveWorkflowTab(newActiveTab);
+      const newWorkflow = updatedWorkflows[newActiveTab];
+      if (newWorkflow) {
+        setNodes(newWorkflow.nodes);
+        setConnections(newWorkflow.connections);
+        saveToHistory(newWorkflow.nodes, newWorkflow.connections);
+      }
+    } else if ((activeWorkflowTab as number) > workflowToDelete) {
+      // If deleting a tab before the active one, decrement active tab index
+      setActiveWorkflowTab((activeWorkflowTab as number) - 1);
+    }
+
+    setWorkflowToDelete(null);
+    addAlert(`Deleted workflow: ${deletedWorkflowName}`, AlertVariant.success);
+  }, [workflowToDelete, projectWorkflows, activeWorkflowTab, saveToHistory, addAlert]);
+
+  // Handle project switching
+  const handleProjectSwitch = React.useCallback((selectedProject: string) => {
+    setIsProjectDropdownOpen(false);
+
+    // Navigate to the project's canvas page
+    navigate(`/canvas/${encodeURIComponent(selectedProject)}`);
+    addAlert(`Switched to project: ${selectedProject}`, AlertVariant.info);
+  }, [navigate, addAlert]);
 
   // Toolbar actions (memoized with useCallback)
   const handleSave = React.useCallback(async () => {
@@ -827,7 +1058,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       };
       localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
 
-      console.log('Workflow saved:', savedWorkflow);
       addAlert('Workflow saved successfully to database!', AlertVariant.success);
     } catch (error) {
       console.error('Error saving workflow:', error);
@@ -840,6 +1070,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           timestamp: new Date().toISOString(),
         };
         localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
+
         addAlert('Workflow saved locally (database unavailable)', AlertVariant.warning);
       } catch (localError) {
         addAlert('Failed to save workflow. Please try again.', AlertVariant.danger);
@@ -915,8 +1146,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
     addAlert('Workflow execution started!', AlertVariant.info);
 
-    console.log('Execution order:', executionOrder);
-
     const totalNodes = nodes.length;
 
     // Execute nodes level by level
@@ -946,41 +1175,39 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
       setExecutingNodes(new Set());
 
-      // Animate connections to next level
-      if (levelIndex < executionOrder.length - 1) {
-        const nextLevel = executionOrder[levelIndex + 1];
-        const activeConns = connections.filter(conn =>
-          level.includes(conn.source) && nextLevel.includes(conn.target)
-        );
+      // Animate ALL outgoing connections from completed nodes in this level
+      const completedNodeIds = new Set(level);
+      const activeConns = connections.filter(conn => completedNodeIds.has(conn.source));
 
-        if (activeConns.length > 0) {
-          setActiveConnections(new Set(activeConns.map(c => c.id)));
+      if (activeConns.length > 0) {
+        setActiveConnections(new Set(activeConns.map(c => c.id)));
 
-          // Create particles for each connection
-          const newParticles = activeConns.map((conn, idx) => ({
-            id: `particle-${conn.id}-${Date.now()}-${idx}`,
-            connectionId: conn.id,
-            progress: 0,
-          }));
+        // Create particles for each connection
+        const newParticles = activeConns.map((conn, idx) => ({
+          id: `particle-${conn.id}-${Date.now()}-${idx}`,
+          connectionId: conn.id,
+          progress: 0,
+        }));
 
-          setParticles(newParticles);
+        setParticles(newParticles);
 
-          // Animate particles
-          const animationDuration = 1000; // 1 second
-          const frameRate = 60;
-          const totalFrames = (animationDuration / 1000) * frameRate;
+        // Animate particles
+        const animationDuration = 1000; // 1 second
+        const frameRate = 60;
+        const totalFrames = (animationDuration / 1000) * frameRate;
 
-          for (let frame = 0; frame <= totalFrames; frame++) {
-            await new Promise(resolve => setTimeout(resolve, 1000 / frameRate));
-            const progress = frame / totalFrames;
-            setParticles(newParticles.map(p => ({ ...p, progress })));
-          }
-
-          setParticles([]);
-          setActiveConnections(new Set());
+        for (let frame = 0; frame <= totalFrames; frame++) {
+          await new Promise(resolve => setTimeout(resolve, 1000 / frameRate));
+          const progress = frame / totalFrames;
+          setParticles(newParticles.map(p => ({ ...p, progress })));
         }
 
-        // Small delay between levels
+        setParticles([]);
+        setActiveConnections(new Set());
+      }
+
+      // Small delay between levels
+      if (levelIndex < executionOrder.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
@@ -998,89 +1225,76 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length, isExecuting, executionOrder, connections, addAlert]);
 
-  // Ref to store timeout ID for cleanup
-  const ongoingFlowTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Ref to track if ongoing animation should continue
+  const ongoingFlowRef = React.useRef<boolean>(false);
+  const animationFrameRef = React.useRef<number>(0);
 
   // Start ongoing flow animation between connected nodes
   const startOngoingFlow = React.useCallback(() => {
-    if (connections.length === 0) return;
+    if (connections.length === 0) {
+      return;
+    }
 
-    setOngoingFlow(true);
+    ongoingFlowRef.current = true;
+    animationFrameRef.current = 0;
 
-    // Animate ALL connections (removed filter and slice)
-    const animatedConnections = connections;
-
-    let animationFrame = 0;
     const animate = () => {
-      // Check if animation should continue
-      setOngoingFlow((currentFlow) => {
-        if (!currentFlow) {
-          if (ongoingFlowTimeoutRef.current) {
-            clearTimeout(ongoingFlowTimeoutRef.current);
-            ongoingFlowTimeoutRef.current = null;
-          }
-          return false;
-        }
+      if (!ongoingFlowRef.current) {
+        setFlowParticles([]);
+        return;
+      }
 
-        const newParticles = animatedConnections.flatMap((conn, idx) => {
-          // Create bidirectional particles with much slower movement
-          // Divide by 200 instead of 100 for half speed
-          const forwardProgress = ((animationFrame + idx * 40) % 200) / 200;
-          const backwardProgress = ((animationFrame + idx * 40 + 100) % 200) / 200;
+      const newParticles = connections.flatMap((conn, idx) => {
+        // Create bidirectional particles with faster movement
+        const forwardProgress = ((animationFrameRef.current * 2 + idx * 40) % 200) / 200;
+        const backwardProgress = ((animationFrameRef.current * 2 + idx * 40 + 100) % 200) / 200;
 
-          return [
-            {
-              id: `flow-forward-${conn.id}-${animationFrame}`,
-              connectionId: conn.id,
-              progress: forwardProgress,
-              direction: 'forward' as const,
-            },
-            {
-              id: `flow-backward-${conn.id}-${animationFrame}`,
-              connectionId: conn.id,
-              progress: backwardProgress,
-              direction: 'backward' as const,
-            },
-          ];
-        });
-
-        setFlowParticles(newParticles);
-        animationFrame++;
-
-        // Schedule next frame with cleanup tracking
-        ongoingFlowTimeoutRef.current = setTimeout(animate, 100); // Even slower: 10 FPS
-        return true;
+        return [
+          {
+            id: `flow-forward-${conn.id}-${animationFrameRef.current}`,
+            connectionId: conn.id,
+            progress: forwardProgress,
+            direction: 'forward' as const,
+          },
+          {
+            id: `flow-backward-${conn.id}-${animationFrameRef.current}`,
+            connectionId: conn.id,
+            progress: backwardProgress,
+            direction: 'backward' as const,
+          },
+        ];
       });
+
+      setFlowParticles(newParticles);
+      animationFrameRef.current++;
+
+      // Schedule next frame
+      if (ongoingFlowRef.current) {
+        setTimeout(animate, 20); // 50 FPS for smoother animation
+      }
     };
 
+    // Start animation
     animate();
   }, [connections]);
 
   // Stop ongoing flow
   const stopOngoingFlow = React.useCallback(() => {
-    setOngoingFlow(false);
+    ongoingFlowRef.current = false;
     setFlowParticles([]);
-    // Clear any pending timeout
-    if (ongoingFlowTimeoutRef.current) {
-      clearTimeout(ongoingFlowTimeoutRef.current);
-      ongoingFlowTimeoutRef.current = null;
-    }
   }, []);
 
   // Stop ongoing flow when new execution starts
   React.useEffect(() => {
-    if (isExecuting && ongoingFlow) {
+    if (isExecuting) {
       stopOngoingFlow();
     }
-  }, [isExecuting, ongoingFlow, stopOngoingFlow]);
+  }, [isExecuting, stopOngoingFlow]);
 
   // Cleanup ongoing flow animation on component unmount
   React.useEffect(() => {
     return () => {
-      if (ongoingFlowTimeoutRef.current) {
-        clearTimeout(ongoingFlowTimeoutRef.current);
-        ongoingFlowTimeoutRef.current = null;
-      }
+      ongoingFlowRef.current = false;
     };
   }, []);
 
@@ -1132,6 +1346,13 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
       addAlert(`Template "${template.name}" loaded successfully!`, AlertVariant.success);
 
+      // Fit to view after loading template
+      setTimeout(() => {
+        if (templateNodes.length > 0) {
+          fitToView();
+        }
+      }, 100);
+
       // Track analytics
       if (window.mixpanel) {
         window.mixpanel.track('Template Applied', {
@@ -1146,7 +1367,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       console.error('Error applying template:', error);
       addAlert('Failed to load template. Please try again.', AlertVariant.danger);
     }
-  }, [saveToHistory, addAlert]);
+  }, [saveToHistory, addAlert, fitToView]);
 
   // Export workflow to JSON file (memoized with useCallback)
   const handleExport = React.useCallback(async () => {
@@ -1204,6 +1425,13 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             setConnections(workflowData.connections);
             saveToHistory(workflowData.nodes, workflowData.connections);
             addAlert('Workflow imported successfully!', AlertVariant.success);
+
+            // Fit to view after importing
+            setTimeout(() => {
+              if (workflowData.nodes.length > 0) {
+                fitToView();
+              }
+            }, 100);
           } else {
             addAlert('Invalid workflow file format', AlertVariant.danger);
           }
@@ -1217,7 +1445,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       reader.readAsText(file);
     };
     input.click();
-  }, [saveToHistory, addAlert]);
+  }, [saveToHistory, addAlert, fitToView]);
 
   // Node action handlers
   const handleNodeAction = (nodeId: string, action: 'launch' | 'chat' | 'reload', e: React.MouseEvent) => {
@@ -1227,17 +1455,14 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
     switch (action) {
       case 'launch':
-        console.log(`Launching ${node.label} (${node.type})`);
         const route = getNodeRoute(node.type);
         navigate(route);
         addAlert(`Navigating to ${node.label}`, AlertVariant.info);
         break;
       case 'chat':
-        console.log(`Opening chat for ${node.label}`);
         addAlert(`Chat with ${node.label} - This would open a chat interface to configure the node interactively.`, AlertVariant.info);
         break;
       case 'reload':
-        console.log(`Reloading ${node.label}`);
         addAlert(`Reloading ${node.label} - Node status and configuration refreshed.`, AlertVariant.success);
         break;
     }
@@ -1297,9 +1522,34 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           <CardBody style={{ padding: '12px 16px' }}>
             <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
               <FlexItem>
-                <Title headingLevel="h1" size="xl">
-                  {projectName}
-                </Title>
+                <Dropdown
+                  isOpen={isProjectDropdownOpen}
+                  onSelect={() => setIsProjectDropdownOpen(false)}
+                  onOpenChange={(isOpen: boolean) => setIsProjectDropdownOpen(isOpen)}
+                  toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                    <MenuToggle
+                      ref={toggleRef}
+                      onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
+                      isExpanded={isProjectDropdownOpen}
+                      style={{ fontSize: '1.25rem', fontWeight: 700 }}
+                    >
+                      {projectName}
+                    </MenuToggle>
+                  )}
+                >
+                  <DropdownList>
+                    {availableProjects.map((project) => (
+                      <DropdownItem
+                        key={project}
+                        value={project}
+                        onClick={() => handleProjectSwitch(project)}
+                        isDisabled={project === projectName}
+                      >
+                        {project}
+                      </DropdownItem>
+                    ))}
+                  </DropdownList>
+                </Dropdown>
               </FlexItem>
               <FlexItem>
                 <Toolbar>
@@ -1358,14 +1608,10 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="link" icon={<UndoIcon />} onClick={undo} isDisabled={!canUndo}>
-                          Undo
-                        </Button>
+                        <Button variant="link" icon={<UndoIcon />} onClick={undo} isDisabled={!canUndo} aria-label="Undo" />
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="link" icon={<RedoIcon />} onClick={redo} isDisabled={!canRedo}>
-                          Redo
-                        </Button>
+                        <Button variant="link" icon={<RedoIcon />} onClick={redo} isDisabled={!canRedo} aria-label="Redo" />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button variant="link" onClick={handleClear}>
@@ -1377,10 +1623,8 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           variant={gridEnabled ? 'primary' : 'secondary'}
                           icon={<ThIcon />}
                           onClick={toggleGrid}
-                          title={gridEnabled ? 'Disable grid' : 'Enable grid'}
-                        >
-                          Grid
-                        </Button>
+                          aria-label={gridEnabled ? 'Disable grid' : 'Enable grid'}
+                        />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
@@ -1388,10 +1632,8 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           icon={<SearchPlusIcon />}
                           onClick={handleZoomIn}
                           isDisabled={zoom >= MAX_ZOOM}
-                          title="Zoom in"
-                        >
-                          Zoom In
-                        </Button>
+                          aria-label="Zoom in"
+                        />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
@@ -1399,26 +1641,79 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           icon={<SearchMinusIcon />}
                           onClick={handleZoomOut}
                           isDisabled={zoom <= MIN_ZOOM}
-                          title="Zoom out"
-                        >
-                          Zoom Out
-                        </Button>
+                          aria-label="Zoom out"
+                        />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
-                          variant="link"
-                          onClick={handleResetZoom}
-                          isDisabled={zoom === 1 && pan.x === 0 && pan.y === 0}
-                          title="Reset zoom"
-                        >
-                          Reset
-                        </Button>
+                          variant={isMinimapOpen ? 'primary' : 'secondary'}
+                          icon={<MapIcon />}
+                          onClick={() => setIsMinimapOpen(!isMinimapOpen)}
+                          aria-label={isMinimapOpen ? 'Hide minimap' : 'Show minimap'}
+                          title={isMinimapOpen ? 'Hide minimap' : 'Show minimap'}
+                        />
                       </ToolbarItem>
                     </ToolbarGroup>
                   </ToolbarContent>
                 </Toolbar>
               </FlexItem>
             </Flex>
+          </CardBody>
+        </Card>
+      </FlexItem>
+
+      {/* Workflow Tabs */}
+      <FlexItem>
+        <Card isCompact>
+          <CardBody style={{ padding: '8px 16px' }}>
+            <Tabs
+              activeKey={activeWorkflowTab}
+              onSelect={handleWorkflowTabSwitch}
+              aria-label="Workflow tabs"
+              isBox
+            >
+              {projectWorkflows.map((workflow, index) => (
+                <Tab
+                  key={workflow.id}
+                  eventKey={index}
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <TabTitleText>{workflow.name}</TabTitleText>
+                      {projectWorkflows.length > 1 && (
+                        <Button
+                          variant="plain"
+                          icon={<TimesIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteWorkflow(index);
+                          }}
+                          size="sm"
+                          aria-label={`Close ${workflow.name}`}
+                          style={{ padding: '2px 4px', minWidth: 'auto' }}
+                        />
+                      )}
+                    </div>
+                  }
+                />
+              ))}
+              <Tab
+                eventKey="add-workflow"
+                title={
+                  <Button
+                    variant="plain"
+                    icon={<PlusIcon />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddWorkflow();
+                    }}
+                    size="sm"
+                  >
+                    Add Workflow
+                  </Button>
+                }
+                isAriaDisabled
+              />
+            </Tabs>
           </CardBody>
         </Card>
       </FlexItem>
@@ -1638,8 +1933,17 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             const targetNode = nodes.find((n) => n.id === conn.target);
             if (!sourceNode || !targetNode) return null;
 
-            const start = getConnectorPosition(sourceNode, conn.sourceConnector || 'right');
-            const end = getConnectorPosition(targetNode, conn.targetConnector || 'left');
+            // For backward particles, swap start and end points
+            const isBackward = particle.direction === 'backward';
+            const start = isBackward
+              ? getConnectorPosition(targetNode, conn.targetConnector || 'left')
+              : getConnectorPosition(sourceNode, conn.sourceConnector || 'right');
+            const end = isBackward
+              ? getConnectorPosition(sourceNode, conn.sourceConnector || 'right')
+              : getConnectorPosition(targetNode, conn.targetConnector || 'left');
+
+            const sourceConnector = isBackward ? conn.targetConnector : conn.sourceConnector;
+            const targetConnector = isBackward ? conn.sourceConnector : conn.targetConnector;
 
             // Calculate point along the curve
             const t = particle.progress;
@@ -1654,23 +1958,23 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             let cp2x = end.x;
             let cp2y = end.y;
 
-            if (conn.sourceConnector === 'right') {
+            if (sourceConnector === 'right') {
               cp1x = start.x + curveStrength;
-            } else if (conn.sourceConnector === 'left') {
+            } else if (sourceConnector === 'left') {
               cp1x = start.x - curveStrength;
-            } else if (conn.sourceConnector === 'top') {
+            } else if (sourceConnector === 'top') {
               cp1y = start.y - curveStrength;
-            } else if (conn.sourceConnector === 'bottom') {
+            } else if (sourceConnector === 'bottom') {
               cp1y = start.y + curveStrength;
             }
 
-            if (conn.targetConnector === 'right') {
+            if (targetConnector === 'right') {
               cp2x = end.x + curveStrength;
-            } else if (conn.targetConnector === 'left') {
+            } else if (targetConnector === 'left') {
               cp2x = end.x - curveStrength;
-            } else if (conn.targetConnector === 'top') {
+            } else if (targetConnector === 'top') {
               cp2y = end.y - curveStrength;
-            } else if (conn.targetConnector === 'bottom') {
+            } else if (targetConnector === 'bottom') {
               cp2y = end.y + curveStrength;
             }
 
@@ -1911,8 +2215,9 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                       />
                     </div>
                   )}
+                  </div>
 
-                  {/* Execution Progress Dialog - Small corner dialog within canvas */}
+                  {/* Execution Progress Dialog - Fixed to top-right corner, outside transformed content */}
                   {isExecuting && (
                     <ExecutionOverlay
                       progress={executionProgress}
@@ -1922,7 +2227,19 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                       statusMessage={executionStatus}
                     />
                   )}
-                  </div>
+
+                  {/* Workflow Minimap - outside transformed content */}
+                  {isMinimapOpen && nodes.length > 0 && (
+                    <WorkflowMinimap
+                      nodes={nodes}
+                      connections={connections}
+                      canvasWidth={canvasRef.current?.clientWidth || 0}
+                      canvasHeight={canvasRef.current?.clientHeight || 0}
+                      zoom={zoom}
+                      pan={pan}
+                      onViewportChange={(newPan) => setPan(newPan)}
+                    />
+                  )}
                 </div>
               </div>
             </DrawerContentBody>
@@ -1965,17 +2282,27 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         </Modal>
       )}
 
-      {/* Workflow Minimap */}
-      {nodes.length > 0 && canvasRef.current && (
-        <WorkflowMinimap
-          nodes={nodes}
-          connections={connections}
-          canvasWidth={canvasRef.current.clientWidth}
-          canvasHeight={canvasRef.current.clientHeight}
-          zoom={zoom}
-          pan={pan}
-          onViewportChange={(newPan) => setPan(newPan)}
-        />
+      {/* Workflow Deletion Confirmation Modal */}
+      {workflowToDelete !== null && (
+        <Modal
+          variant={ModalVariant.small}
+          title="Delete Workflow"
+          isOpen={true}
+          onClose={() => setWorkflowToDelete(null)}
+        >
+          <ModalBody>
+            Are you sure you want to delete workflow "{projectWorkflows[workflowToDelete]?.name}"?
+            All nodes and connections in this workflow will be lost. This action cannot be undone.
+          </ModalBody>
+          <div style={{ padding: '16px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setWorkflowToDelete(null)}>
+              No, Cancel
+            </Button>
+            <Button variant="danger" onClick={confirmDeleteWorkflow}>
+              Yes, Delete Workflow
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {/* Template Selector Modal */}
