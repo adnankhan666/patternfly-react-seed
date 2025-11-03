@@ -156,53 +156,11 @@ export const useNavigationData = (): NavDataItem[] => {
           },
         ],
       },
-      // Distributed Workload Metrics
-      {
-        id: 'workloadMetrics',
-        label: 'Distributed Workload Metrics',
-        href: '/distributedWorkloads',
-      },
-      // Extensions
-      {
-        id: 'extensions',
-        label: 'Extensions',
-        href: '/extensions',
-      },
-      // Feast
-      {
-        id: 'feast',
-        label: 'Feast',
-        href: '/feast',
-      },
-      // Hardware Profiles
-      {
-        id: 'hardwareProfiles',
-        label: 'Hardware Profiles',
-        href: '/hardwareProfiles',
-      },
-      // MCP Servers
-      {
-        id: 'mcpServers',
-        label: 'MCP Servers',
-        href: '/mcpServers',
-      },
       // Model Catalog
       {
         id: 'modelCatalog',
         label: 'Model Catalog',
         href: '/modelCatalog',
-      },
-      // Model Registry
-      {
-        id: 'modelRegistry',
-        label: 'Model Registry',
-        href: '/modelRegistry',
-      },
-      // Model Serving
-      {
-        id: 'modelServing',
-        label: 'Model Serving',
-        href: '/modelServing',
       },
       // Notebooks
       {
@@ -210,23 +168,17 @@ export const useNavigationData = (): NavDataItem[] => {
         label: 'Notebooks',
         href: '/notebooks',
       },
-      // Resources
-      {
-        id: 'resources',
-        label: 'Resources',
-        href: '/resources',
-      },
       // Training
       {
         id: 'training',
         label: 'Training',
         href: '/training',
       },
-      // Tuning
+      // Telemetry
       {
-        id: 'tuning',
-        label: 'Tuning',
-        href: '/tuning',
+        id: 'telemetry',
+        label: 'Telemetry',
+        href: '/telemetry',
       },
       // Settings (Expandable Group - Admin Only)
       {
