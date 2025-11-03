@@ -36,6 +36,7 @@ const Notebooks = React.lazy(() => import('@app/Notebooks/Notebooks').then(m => 
 const Resources = React.lazy(() => import('@app/Resources/Resources').then(m => ({ default: m.Resources })));
 const Training = React.lazy(() => import('@app/Training/Training').then(m => ({ default: m.Training })));
 const Tuning = React.lazy(() => import('@app/Tuning/Tuning').then(m => ({ default: m.Tuning })));
+const Telemetry = React.lazy(() => import('@app/Telemetry/Telemetry').then(m => ({ default: m.Telemetry })));
 const NotebookImages = React.lazy(() => import('@app/Settings/NotebookImages').then(m => ({ default: m.NotebookImages })));
 const ClusterSettings = React.lazy(() => import('@app/Settings/ClusterSettings').then(m => ({ default: m.ClusterSettings })));
 const AcceleratorProfiles = React.lazy(() => import('@app/Settings/AcceleratorProfiles').then(m => ({ default: m.AcceleratorProfiles })));
@@ -211,6 +212,12 @@ const routes: AppRouteConfig[] = [
     exact: true,
     path: '/tuning',
     title: 'ODH Dashboard | Tuning',
+  },
+  {
+    element: <Telemetry />,
+    exact: true,
+    path: '/telemetry',
+    title: 'ODH Dashboard | Telemetry',
   },
   {
     element: <NotebookImages />,
