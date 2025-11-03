@@ -166,6 +166,7 @@ export const getNodeRoute = (nodeType: string): string => {
     pipelines: '/pipelines',
     training: '/training',
     tuning: '/tuning',
+    telemetry: '/telemetry',
   };
   return routeMap[nodeType] || '/';
 };

@@ -74,6 +74,16 @@ import {
 import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector } from './components';
 import { saveWorkflowState, loadWorkflowState } from '../../services/workflowService';
 import { WorkflowTemplate } from '../../data/workflowTemplates';
+import { mockTelemetryData } from '../../data/mockTelemetry';
+import {
+  Chart,
+  ChartAxis,
+  ChartGroup,
+  ChartLine,
+  ChartThemeColor,
+  ChartVoronoiContainer,
+  ChartDonut,
+} from '@patternfly/react-charts/victory';
 import './WorkflowCanvas.css';
 
 interface WorkflowCanvasProps {
@@ -604,6 +614,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       pipelines: '/pipelines',
       training: '/training',
       tuning: '/tuning',
+      telemetry: '/telemetry',
     };
     return routeMap[nodeType] || '/';
   }, []);
@@ -1734,101 +1745,283 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                     </DrawerActions>
                   </DrawerHead>
                   <DrawerContentBody>
-                    <Tabs
-                      activeKey={activeTab}
-                      onSelect={(event, tabIndex) => setActiveTab(tabIndex)}
-                      aria-label="Node details tabs"
-                    >
-                      <Tab eventKey={0} title={<TabTitleText>Properties</TabTitleText>}>
-                        <div style={{ padding: '16px' }}>
-                          {selectedNode && (() => {
-                            const node = nodes.find((n) => n.id === selectedNode);
-                            if (!node) return null;
-                            return (
-                              <>
-                                <FormGroup label="Node ID">
-                                  <TextInput value={node.id} isDisabled aria-label="Node ID" />
-                                </FormGroup>
-                                <FormGroup label="Type">
-                                  <TextInput value={node.type} isDisabled aria-label="Node Type" />
-                                </FormGroup>
-                                <FormGroup label="Label">
-                                  <TextInput
-                                    value={node.label}
-                                    onChange={(e, val) => {
-                                      setNodes(
-                                        nodes.map((n) =>
-                                          n.id === selectedNode ? { ...n, label: val } : n,
-                                        ),
-                                      );
+                    {(() => {
+                      const node = nodes.find((n) => n.id === selectedNode);
+                      if (!node) return null;
+
+                      // Show telemetry charts for Telemetry nodes
+                      if (node.type === 'telemetry') {
+                        const { systemMetrics, workflowMetrics, nodeStatistics } = mockTelemetryData;
+
+                        // Format data for charts
+                        const cpuData = systemMetrics.historical.slice(0, 12).map((metric, i) => ({ x: i, y: metric.cpuUsage }));
+                        const memoryData = systemMetrics.historical.slice(0, 12).map((metric, i) => ({ x: i, y: metric.memoryUsage }));
+
+                        return (
+                          <div style={{ padding: '16px', overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+                            <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsMd' }}>
+                              {/* System Metrics */}
+                              <FlexItem>
+                                <Title headingLevel="h3" size="md" style={{ marginBottom: '12px' }}>
+                                  System Metrics
+                                </Title>
+                                <Card isCompact>
+                                  <CardBody>
+                                    <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsSm' }}>
+                                      <FlexItem>
+                                        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
+                                          <FlexItem>
+                                            <span style={{ color: '#6b7280', fontSize: '14px' }}>CPU Usage</span>
+                                          </FlexItem>
+                                          <FlexItem>
+                                            <span style={{ fontWeight: 700, color: '#06b6d4' }}>
+                                              {systemMetrics.current.cpuUsage.toFixed(1)}%
+                                            </span>
+                                          </FlexItem>
+                                        </Flex>
+                                      </FlexItem>
+                                      <FlexItem>
+                                        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
+                                          <FlexItem>
+                                            <span style={{ color: '#6b7280', fontSize: '14px' }}>Memory Usage</span>
+                                          </FlexItem>
+                                          <FlexItem>
+                                            <span style={{ fontWeight: 700, color: '#8b5cf6' }}>
+                                              {systemMetrics.current.memoryUsage.toFixed(1)}%
+                                            </span>
+                                          </FlexItem>
+                                        </Flex>
+                                      </FlexItem>
+                                      <FlexItem>
+                                        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
+                                          <FlexItem>
+                                            <span style={{ color: '#6b7280', fontSize: '14px' }}>Active Workflows</span>
+                                          </FlexItem>
+                                          <FlexItem>
+                                            <span style={{ fontWeight: 700, color: '#10b981' }}>
+                                              {systemMetrics.current.activeWorkflows}
+                                            </span>
+                                          </FlexItem>
+                                        </Flex>
+                                      </FlexItem>
+                                    </Flex>
+                                  </CardBody>
+                                </Card>
+                              </FlexItem>
+
+                              {/* Resource Usage Chart */}
+                              <FlexItem>
+                                <Title headingLevel="h3" size="md" style={{ marginBottom: '12px' }}>
+                                  Resource Usage
+                                </Title>
+                                <div style={{ height: 200 }}>
+                                  <Chart
+                                    ariaDesc="System resource usage"
+                                    ariaTitle="Resource usage"
+                                    containerComponent={
+                                      <ChartVoronoiContainer
+                                        labels={({ datum }) => `${datum.y.toFixed(1)}%`}
+                                        constrainToVisibleArea
+                                      />
+                                    }
+                                    height={200}
+                                    padding={{
+                                      bottom: 40,
+                                      left: 50,
+                                      right: 20,
+                                      top: 20,
                                     }}
-                                    aria-label="Node Label"
-                                  />
-                                </FormGroup>
-                                <FormGroup label="Description">
-                                  <TextArea
-                                    value={node.data?.description || ''}
-                                    onChange={(e, val) => {
-                                      setNodes(
-                                        nodes.map((n) =>
-                                          n.id === selectedNode
-                                            ? { ...n, data: { ...n.data, description: val } }
-                                            : n,
-                                        ),
-                                      );
+                                    maxDomain={{ y: 100 }}
+                                    themeColor={ChartThemeColor.multiOrdered}
+                                  >
+                                    <ChartAxis />
+                                    <ChartAxis dependentAxis showGrid />
+                                    <ChartGroup>
+                                      <ChartLine data={cpuData} name="CPU" />
+                                      <ChartLine data={memoryData} name="Memory" />
+                                    </ChartGroup>
+                                  </Chart>
+                                </div>
+                              </FlexItem>
+
+                              {/* Workflow Success Rate */}
+                              <FlexItem>
+                                <Title headingLevel="h3" size="md" style={{ marginBottom: '12px' }}>
+                                  Workflow Success Rate
+                                </Title>
+                                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <ChartDonut
+                                    ariaDesc="Workflow success rate"
+                                    ariaTitle="Success rate"
+                                    constrainToVisibleArea
+                                    data={[
+                                      { x: 'Success', y: workflowMetrics.successRate },
+                                      { x: 'Failure', y: workflowMetrics.failureRate },
+                                    ]}
+                                    labels={({ datum }) => `${datum.x}: ${datum.y.toFixed(1)}%`}
+                                    subTitle="Success"
+                                    title={`${workflowMetrics.successRate.toFixed(1)}%`}
+                                    width={350}
+                                    height={180}
+                                    padding={{
+                                      bottom: 20,
+                                      left: 20,
+                                      right: 120,
+                                      top: 20,
                                     }}
-                                    aria-label="Node Description"
-                                    rows={4}
+                                    colorScale={['#10b981', '#ef4444']}
                                   />
-                                </FormGroup>
-                                <FormGroup label="Position">
-                                  <DescriptionList isHorizontal>
-                                    <DescriptionListGroup>
-                                      <DescriptionListTerm>X</DescriptionListTerm>
-                                      <DescriptionListDescription>
-                                        {Math.round(node.position.x)}px
-                                      </DescriptionListDescription>
-                                    </DescriptionListGroup>
-                                    <DescriptionListGroup>
-                                      <DescriptionListTerm>Y</DescriptionListTerm>
-                                      <DescriptionListDescription>
-                                        {Math.round(node.position.y)}px
-                                      </DescriptionListDescription>
-                                    </DescriptionListGroup>
-                                  </DescriptionList>
-                                </FormGroup>
-                                <FormGroup label="Size">
-                                  <DescriptionList isHorizontal>
-                                    <DescriptionListGroup>
-                                      <DescriptionListTerm>Width</DescriptionListTerm>
-                                      <DescriptionListDescription>
-                                        {node.size?.width || 180}px
-                                      </DescriptionListDescription>
-                                    </DescriptionListGroup>
-                                    <DescriptionListGroup>
-                                      <DescriptionListTerm>Height</DescriptionListTerm>
-                                      <DescriptionListDescription>
-                                        {node.size?.height || 100}px
-                                      </DescriptionListDescription>
-                                    </DescriptionListGroup>
-                                  </DescriptionList>
-                                </FormGroup>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </Tab>
-                      <Tab eventKey={1} title={<TabTitleText>Logs</TabTitleText>}>
-                        <div style={{ padding: '16px' }}>
-                          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                            No execution logs available for this node.
-                          </p>
-                          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '12px' }}>
-                            Logs will appear here when the node is executed as part of a workflow run.
-                          </p>
-                        </div>
-                      </Tab>
-                    </Tabs>
+                                </div>
+                              </FlexItem>
+
+                              {/* Most Used Nodes */}
+                              <FlexItem>
+                                <Title headingLevel="h3" size="md" style={{ marginBottom: '12px' }}>
+                                  Most Used Nodes
+                                </Title>
+                                <Card isCompact>
+                                  <CardBody>
+                                    <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsSm' }}>
+                                      {nodeStatistics.slice(0, 5).map((nodeStat) => {
+                                        const maxCount = Math.max(...nodeStatistics.map((n) => n.count));
+                                        const percentage = (nodeStat.count / maxCount) * 100;
+
+                                        return (
+                                          <FlexItem key={nodeStat.nodeType}>
+                                            <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsXs' }}>
+                                              <FlexItem>
+                                                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
+                                                  <FlexItem>
+                                                    <span style={{ fontSize: '14px' }}>{nodeStat.nodeType}</span>
+                                                  </FlexItem>
+                                                  <FlexItem>
+                                                    <span style={{ fontWeight: 700, color: nodeStat.color }}>
+                                                      {nodeStat.count}
+                                                    </span>
+                                                  </FlexItem>
+                                                </Flex>
+                                              </FlexItem>
+                                              <FlexItem>
+                                                <div style={{
+                                                  width: '100%',
+                                                  height: '6px',
+                                                  backgroundColor: '#e5e7eb',
+                                                  borderRadius: '3px',
+                                                  overflow: 'hidden',
+                                                }}>
+                                                  <div style={{
+                                                    width: `${percentage}%`,
+                                                    height: '100%',
+                                                    backgroundColor: nodeStat.color,
+                                                    borderRadius: '3px',
+                                                    transition: 'width 0.3s ease',
+                                                  }} />
+                                                </div>
+                                              </FlexItem>
+                                            </Flex>
+                                          </FlexItem>
+                                        );
+                                      })}
+                                    </Flex>
+                                  </CardBody>
+                                </Card>
+                              </FlexItem>
+                            </Flex>
+                          </div>
+                        );
+                      }
+
+                      // Default: Show standard Properties/Logs tabs for other node types
+                      return (
+                        <Tabs
+                          activeKey={activeTab}
+                          onSelect={(event, tabIndex) => setActiveTab(tabIndex)}
+                          aria-label="Node details tabs"
+                        >
+                          <Tab eventKey={0} title={<TabTitleText>Properties</TabTitleText>}>
+                            <div style={{ padding: '16px' }}>
+                              <FormGroup label="Node ID">
+                                <TextInput value={node.id} isDisabled aria-label="Node ID" />
+                              </FormGroup>
+                              <FormGroup label="Type">
+                                <TextInput value={node.type} isDisabled aria-label="Node Type" />
+                              </FormGroup>
+                              <FormGroup label="Label">
+                                <TextInput
+                                  value={node.label}
+                                  onChange={(e, val) => {
+                                    setNodes(
+                                      nodes.map((n) =>
+                                        n.id === selectedNode ? { ...n, label: val } : n,
+                                      ),
+                                    );
+                                  }}
+                                  aria-label="Node Label"
+                                />
+                              </FormGroup>
+                              <FormGroup label="Description">
+                                <TextArea
+                                  value={node.data?.description || ''}
+                                  onChange={(e, val) => {
+                                    setNodes(
+                                      nodes.map((n) =>
+                                        n.id === selectedNode
+                                          ? { ...n, data: { ...n.data, description: val } }
+                                          : n,
+                                      ),
+                                    );
+                                  }}
+                                  aria-label="Node Description"
+                                  rows={4}
+                                />
+                              </FormGroup>
+                              <FormGroup label="Position">
+                                <DescriptionList isHorizontal>
+                                  <DescriptionListGroup>
+                                    <DescriptionListTerm>X</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                      {Math.round(node.position.x)}px
+                                    </DescriptionListDescription>
+                                  </DescriptionListGroup>
+                                  <DescriptionListGroup>
+                                    <DescriptionListTerm>Y</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                      {Math.round(node.position.y)}px
+                                    </DescriptionListDescription>
+                                  </DescriptionListGroup>
+                                </DescriptionList>
+                              </FormGroup>
+                              <FormGroup label="Size">
+                                <DescriptionList isHorizontal>
+                                  <DescriptionListGroup>
+                                    <DescriptionListTerm>Width</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                      {node.size?.width || 180}px
+                                    </DescriptionListDescription>
+                                  </DescriptionListGroup>
+                                  <DescriptionListGroup>
+                                    <DescriptionListTerm>Height</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                      {node.size?.height || 100}px
+                                    </DescriptionListDescription>
+                                  </DescriptionListGroup>
+                                </DescriptionList>
+                              </FormGroup>
+                            </div>
+                          </Tab>
+                          <Tab eventKey={1} title={<TabTitleText>Logs</TabTitleText>}>
+                            <div style={{ padding: '16px' }}>
+                              <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                No execution logs available for this node.
+                              </p>
+                              <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '12px' }}>
+                                Logs will appear here when the node is executed as part of a workflow run.
+                              </p>
+                            </div>
+                          </Tab>
+                        </Tabs>
+                      );
+                    })()}
                   </DrawerContentBody>
                 </DrawerPanelContent>
               ) : undefined
