@@ -116,4 +116,11 @@ export const NODE_TYPES: WorkflowNode[] = [
     description: 'Hyperparameter tuning and optimization',
     color: '#f43f5e',
   },
+  {
+    id: 'telemetry',
+    type: 'action',
+    name: 'Telemetry',
+    description: 'Monitor system and workflow metrics',
+    color: '#06b6d4',
+  },
 ];
