@@ -1,10 +1,51 @@
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const workflowRoutes = require('./workflowRoutes');
+const authRoutes = require('./authRoutes');
+const projectRoutes = require('./projectRoutes');
+const executionRoutes = require('./executionRoutes');
+const modelRoutes = require('./modelRoutes');
+const pipelineRoutes = require('./pipelineRoutes');
+const experimentRoutes = require('./experimentRoutes');
+const notebookRoutes = require('./notebookRoutes');
+const trainingRoutes = require('./trainingRoutes');
+const Project = require('./models/Project');
+const Execution = require('./models/Execution');
+const RegisteredModel = require('./models/RegisteredModel');
+const Workflow = require('./models/Workflow');
+const Pipeline = require('./models/Pipeline');
+const Experiment = require('./models/Experiment');
+const Notebook = require('./models/Notebook');
+const TrainingJob = require('./models/TrainingJob');
+const { isDBConnected } = require('./database');
 const router = express.Router();
+
+// Authentication routes (public)
+router.use('/auth', authRoutes);
 
 // Workflow routes
 router.use('/workflows', workflowRoutes);
+
+// Project routes
+router.use('/projects', projectRoutes);
+
+// Execution routes
+router.use('/executions', executionRoutes);
+
+// Model routes
+router.use('/models', modelRoutes);
+
+// Pipeline routes
+router.use('/pipelines', pipelineRoutes);
+
+// Experiment routes
+router.use('/experiments', experimentRoutes);
+
+// Notebook routes
+router.use('/notebooks', notebookRoutes);
+
+// Training routes
+router.use('/training', trainingRoutes);
 
 // Initialize Google Generative AI client
 const getGeminiClient = () => {
@@ -17,10 +58,124 @@ const getGeminiClient = () => {
   return new GoogleGenerativeAI(apiKey);
 };
 
+// Fetch fresh data from database for chatbot context
+async function fetchFreshContext() {
+  if (!isDBConnected()) {
+    return null;
+  }
+
+  try {
+    const [projects, models, executions, workflows, pipelines, experiments, notebooks, trainingJobs] = await Promise.all([
+      Project.find({}).limit(100),
+      RegisteredModel.find({}).limit(100),
+      Execution.find({}).sort({ startTime: -1 }).limit(50),
+      Workflow.find({}).limit(50),
+      Pipeline.find({}).limit(100),
+      Experiment.find({}).limit(100),
+      Notebook.find({}).limit(100),
+      TrainingJob.find({}).limit(100),
+    ]);
+
+    return {
+      projects: projects.map(p => ({
+        name: p.name,
+        displayName: p.displayName,
+        description: p.description,
+        owner: p.owner,
+        phase: p.phase,
+        tags: p.tags,
+        collaborators: p.collaborators,
+        workflowCount: p.workflowCount,
+      })),
+      modelRegistry: models.map(m => {
+        const customProps = m.customProperties instanceof Map
+          ? Object.fromEntries(m.customProperties)
+          : (m.customProperties || {});
+        return {
+          id: m.modelId,
+          name: m.name,
+          owner: m.owner,
+          state: m.state,
+          stage: m.state,
+          description: m.description,
+          framework: customProps.framework || 'unknown',
+          version: customProps.version || 'unknown',
+          accuracy: customProps.accuracy
+            ? Math.round(customProps.accuracy * 100)
+            : 0,
+        };
+      }),
+      pipelineRuns: executions.map(e => ({
+        id: e.executionId,
+        name: e.workflowName,
+        status: e.status,
+        triggeredBy: e.triggeredBy,
+        progress: e.progress,
+        totalNodes: e.totalNodes,
+        completedNodes: e.completedNodes,
+        failedNodes: e.failedNodes,
+      })),
+      workflows: workflows.map(w => ({
+        id: w.workflowId,
+        name: w.name,
+        description: w.description,
+        status: w.status,
+        version: w.version,
+        createdBy: w.createdBy,
+      })),
+      pipelines: pipelines.map(p => ({
+        id: p.pipelineId,
+        name: p.name,
+        description: p.description,
+        status: p.status,
+        owner: p.owner,
+        version: p.version,
+        runsCount: p.runsCount,
+        successRate: p.successRate,
+        tags: p.tags,
+      })),
+      experiments: experiments.map(e => ({
+        id: e.experimentId,
+        name: e.name,
+        description: e.description,
+        status: e.status,
+        owner: e.owner,
+        framework: e.framework,
+        parameters: e.parameters,
+        metrics: e.metrics,
+      })),
+      notebooks: notebooks.map(n => ({
+        id: n.notebookId,
+        name: n.name,
+        description: n.description,
+        status: n.status,
+        owner: n.owner,
+        image: n.image,
+        size: n.size,
+        gpus: n.gpus,
+      })),
+      trainingJobs: trainingJobs.map(t => ({
+        id: t.jobId,
+        name: t.name,
+        description: t.description,
+        status: t.status,
+        framework: t.framework,
+        modelType: t.modelType,
+        owner: t.owner,
+        metrics: t.metrics,
+        resources: t.resources,
+      })),
+    };
+  } catch (error) {
+    console.error('Error fetching context from database:', error);
+    return null;
+  }
+}
+
 // POST /api/chat - Send message to Gemini AI
 router.post('/chat', async (req, res) => {
   try {
-    const { message, conversationHistory, appContext } = req.body;
+    const { message, conversationHistory } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required and must be a string' });
@@ -29,31 +184,73 @@ router.post('/chat', async (req, res) => {
     const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    // Build system instruction with context
-    const contextInfo = appContext ? formatAppContext(appContext) : '';
+    // Fetch FRESH data directly from database - ignore frontend context
+    const freshContext = await fetchFreshContext();
+    const contextInfo = freshContext ? formatAppContext(freshContext) : 'No database connection - limited functionality.';
 
-    const systemInstruction = `You are Gemini, an AI assistant for the Open Data Hub dashboard - a comprehensive ML/AI platform.
+    // Debug: Log what we fetched
+    console.log('API /chat - Fetched FRESH context from DB:', {
+      hasContext: !!freshContext,
+      projectCount: freshContext?.projects?.length || 0,
+      modelCount: freshContext?.modelRegistry?.length || 0,
+      executionCount: freshContext?.pipelines?.length || 0,
+      workflowCount: freshContext?.experiments?.length || 0,
+    });
+
+    const systemInstruction = `You are an AI assistant for the Open Data Hub dashboard.
 
 ${contextInfo}
 
-You can help users with:
-- **Models**: Search, compare, and recommend models from the catalog
-- **Experiments**: Track and analyze ML experiments and their metrics
-- **Pipelines**: Monitor and troubleshoot data and ML pipelines
-- **Projects**: Manage ML projects and their components
-- **Notebooks**: Information about Jupyter notebooks and development environments
-- **Model Registry**: Version control and deployment stages for models
-- **Workflows**: Build and connect workflow nodes for ML pipelines
-- **General ML/AI**: Explain concepts, suggest best practices, troubleshoot issues
+===========================
+TERMINOLOGY:
+===========================
 
-When answering:
-1. Use the context data above to provide specific, accurate information
-2. If asked about specific items (e.g., "show me Model-A"), search the context and provide detailed info
-3. For comparisons, analyze multiple items and highlight differences
-4. Be concise but thorough
-5. If information isn't in the context, say so clearly
+"Canvas" = Data Science Projects (the === PROJECTS === section above)
+When users ask about "Canvas projects", they mean the projects listed in the === PROJECTS === section.
 
-Be helpful, accurate, and friendly!`;
+===========================
+ABSOLUTE RULES - NO EXCEPTIONS:
+===========================
+
+1. YOU MUST ONLY USE DATA FROM THE SECTIONS ABOVE (marked with ===)
+2. DO NOT INVENT, CREATE, OR HALLUCINATE ANY DATA
+3. DO NOT USE PLACEHOLDER NAMES LIKE "Model A", "Model B", "Project X"
+4. IF THE CONTEXT IS EMPTY OR DOESN'T HAVE THE REQUESTED DATA, SAY "No data available"
+5. QUOTE EXACT NAMES from the sections above - copy them character-by-character
+
+===========================
+HOW TO ANSWER:
+===========================
+
+When asked about "Canvas" or "Canvas projects":
+- Look at the === PROJECTS === section above
+- List ALL projects you see there
+- Copy the EXACT names you see there
+
+When asked to "list models" or "show models":
+- Look at the === MODEL REGISTRY === section above
+- Copy the EXACT names you see there
+- Use the EXACT accuracy, framework, and version numbers shown
+- DO NOT add models that aren't listed
+- DO NOT change any names or numbers
+
+===========================
+WRONG ANSWERS (NEVER DO THIS):
+===========================
+❌ Model A (Accuracy: 95%, Size: 500MB)
+❌ Model B (Accuracy: 93%, Size: 250MB)
+❌ Project X, Project Y, Project Z
+
+===========================
+RIGHT ANSWERS (ALWAYS DO THIS):
+===========================
+✅ Live Production Model v2.0: Framework: tensorflow, Accuracy: 95%
+✅ BERT Language Model v1.0: Framework: transformers, Accuracy: 92%
+
+If you cannot find the exact data in the sections above, respond with:
+"I cannot find this information in the current data. The available data shows: [list what you actually see]"
+
+REMEMBER: Only use data from the === sections above. Never invent data.`;
 
     // Convert conversation history to Gemini format
     const history = (conversationHistory || []).map(msg => ({
@@ -66,7 +263,9 @@ Be helpful, accurate, and friendly!`;
       history: history,
       generationConfig: {
         maxOutputTokens: 2048,
-        temperature: 0.7,
+        temperature: 0, // Zero temperature for completely deterministic, factual responses
+        topP: 0.1, // Very low topP to prevent creativity
+        topK: 1, // Only consider the most likely token
       },
     });
 
@@ -105,71 +304,73 @@ function formatAppContext(context) {
 
   let contextStr = '';
 
-  // Models context
-  if (context.models && context.models.length > 0) {
-    const modelInfo = context.models.map(model =>
-      `- ${model.name}: Version ${model.version}, Status: ${model.status}, Accuracy: ${model.accuracy}%, Latency: ${model.latency}ms, Throughput: ${model.throughput} req/s`
+  // Projects context
+  if (context.projects && context.projects.length > 0) {
+    const projectInfo = context.projects.map(proj =>
+      `- ${proj.displayName || proj.name}: Owner: ${proj.owner}, Phase: ${proj.phase}, Description: ${proj.description || 'N/A'}, Workflows: ${proj.workflowCount || 0}`
     ).join('\n');
-    contextStr += `\n\n=== MODELS (${context.models.length}) ===\n${modelInfo}`;
+    contextStr += `\n\n=== PROJECTS (${context.projects.length}) ===\n${projectInfo}`;
   }
 
-  // Experiments context
-  if (context.experiments && context.experiments.length > 0) {
-    const expInfo = context.experiments.map(exp =>
-      `- ${exp.name} (${exp.id}): Status: ${exp.status}, Framework: ${exp.framework}, Owner: ${exp.owner}`
-    ).join('\n');
-    contextStr += `\n\n=== EXPERIMENTS (${context.experiments.length}) ===\n${expInfo}`;
+  // Model Registry context
+  if (context.modelRegistry && context.modelRegistry.length > 0) {
+    const registryInfo = context.modelRegistry.map(model => {
+      const accuracy = model.accuracy && model.accuracy > 0
+        ? `${model.accuracy}%`
+        : 'No accuracy data';
+      return `- ${model.name}: Framework: ${model.framework}, Version: ${model.version}, Accuracy: ${accuracy}, State: ${model.state}, Owner: ${model.owner}`;
+    }).join('\n');
+    contextStr += `\n\n=== MODEL REGISTRY (${context.modelRegistry.length}) ===\n${registryInfo}`;
   }
 
   // Pipelines context
   if (context.pipelines && context.pipelines.length > 0) {
     const pipelineInfo = context.pipelines.map(pipeline =>
-      `- ${pipeline.name} (${pipeline.id}): Status: ${pipeline.status}, Success: ${pipeline.success}, Duration: ${pipeline.duration}`
+      `- ${pipeline.name}: Status: ${pipeline.status}, Owner: ${pipeline.owner}, Version: ${pipeline.version}, Runs: ${pipeline.runsCount}, Success Rate: ${pipeline.successRate}%`
     ).join('\n');
-    contextStr += `\n\n=== PIPELINES (${context.pipelines.length}) ===\n${pipelineInfo}`;
+    contextStr += `\n\n=== DATA PIPELINES (${context.pipelines.length}) ===\n${pipelineInfo}`;
   }
 
-  // Projects context
-  if (context.projects && context.projects.length > 0) {
-    const projectInfo = context.projects.map(proj =>
-      `- ${proj.name}: ${proj.description}, Team: ${proj.team}, Status: ${proj.status}`
-    ).join('\n');
-    contextStr += `\n\n=== PROJECTS (${context.projects.length}) ===\n${projectInfo}`;
+  // Experiments context
+  if (context.experiments && context.experiments.length > 0) {
+    const expInfo = context.experiments.map(exp => {
+      const metricsStr = exp.metrics ? Object.entries(exp.metrics).map(([k, v]) => `${k}: ${v}`).join(', ') : 'No metrics';
+      return `- ${exp.name}: Status: ${exp.status}, Framework: ${exp.framework}, Owner: ${exp.owner}, Metrics: ${metricsStr}`;
+    }).join('\n');
+    contextStr += `\n\n=== EXPERIMENTS (${context.experiments.length}) ===\n${expInfo}`;
   }
 
   // Notebooks context
   if (context.notebooks && context.notebooks.length > 0) {
     const notebookInfo = context.notebooks.map(nb =>
-      `- ${nb.name}: Status: ${nb.status}, Framework: ${nb.framework}, Owner: ${nb.owner}, Size: ${nb.size}`
+      `- ${nb.name}: Status: ${nb.status}, Owner: ${nb.owner}, Image: ${nb.image}, Size: ${nb.size}, GPUs: ${nb.gpus}`
     ).join('\n');
     contextStr += `\n\n=== NOTEBOOKS (${context.notebooks.length}) ===\n${notebookInfo}`;
   }
 
-  // Model Registry context
-  if (context.modelRegistry && context.modelRegistry.length > 0) {
-    const registryInfo = context.modelRegistry.map(model =>
-      `- ${model.name} v${model.version}: Framework: ${model.framework}, Accuracy: ${model.accuracy}%, Stage: ${model.stage}`
-    ).join('\n');
-    contextStr += `\n\n=== MODEL REGISTRY (${context.modelRegistry.length}) ===\n${registryInfo}`;
+  // Training Jobs context
+  if (context.trainingJobs && context.trainingJobs.length > 0) {
+    const trainingInfo = context.trainingJobs.map(job => {
+      const metricsStr = job.metrics ? Object.entries(job.metrics).map(([k, v]) => `${k}: ${v}`).join(', ') : 'No metrics';
+      return `- ${job.name}: Status: ${job.status}, Framework: ${job.framework}, Model Type: ${job.modelType || 'N/A'}, Owner: ${job.owner}, Metrics: ${metricsStr}`;
+    }).join('\n');
+    contextStr += `\n\n=== TRAINING JOBS (${context.trainingJobs.length}) ===\n${trainingInfo}`;
   }
 
-  // Workflow context
-  if (context.nodes && context.connections) {
-    if (context.nodes.length > 0 || context.connections.length > 0) {
-      const nodeInfo = context.nodes.map(node =>
-        `- ${node.label} (${node.type}): ${node.data?.description || 'No description'}`
-      ).join('\n');
+  // Pipeline Runs / Executions context
+  if (context.pipelineRuns && context.pipelineRuns.length > 0) {
+    const runInfo = context.pipelineRuns.map(run =>
+      `- ${run.name}: Status: ${run.status}, Triggered By: ${run.triggeredBy}, Progress: ${run.progress}%, Nodes: ${run.completedNodes}/${run.totalNodes} completed, Failed: ${run.failedNodes}`
+    ).join('\n');
+    contextStr += `\n\n=== PIPELINE RUNS (${context.pipelineRuns.length}) ===\n${runInfo}`;
+  }
 
-      const connectionInfo = context.connections.length > 0
-        ? `\nConnections:\n${context.connections.map(conn => {
-            const sourceNode = context.nodes?.find((n) => n.id === conn.source);
-            const targetNode = context.nodes?.find((n) => n.id === conn.target);
-            return `- ${sourceNode?.label || 'Unknown'} → ${targetNode?.label || 'Unknown'}`;
-          }).join('\n')}`
-        : '\nNo connections between nodes.';
-
-      contextStr += `\n\n=== WORKFLOW: ${context.projectName || 'Unnamed'} ===\nNodes:\n${nodeInfo}${connectionInfo}`;
-    }
+  // Workflows context
+  if (context.workflows && context.workflows.length > 0) {
+    const workflowInfo = context.workflows.map(w =>
+      `- ${w.name}: Status: ${w.status}, Version: ${w.version}, Created By: ${w.createdBy}, Description: ${w.description || 'N/A'}`
+    ).join('\n');
+    contextStr += `\n\n=== WORKFLOWS (${context.workflows.length}) ===\n${workflowInfo}`;
   }
 
   return contextStr || 'No context available.';

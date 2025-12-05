@@ -40,6 +40,14 @@ export const sendMessageToClaude = async (
   try {
     const apiUrl = getApiUrl();
 
+    // Debug: Log what we're sending
+    console.log('claudeService - Sending to API:', {
+      hasContext: !!appContext,
+      contextKeys: appContext ? Object.keys(appContext) : [],
+      projectCount: appContext?.projects?.length || 0,
+      modelCount: appContext?.modelRegistry?.length || 0,
+    });
+
     const response = await fetch(`${apiUrl}/api/chat`, {
       method: 'POST',
       headers: {

@@ -53,6 +53,14 @@ const ChatBot: React.FunctionComponent<ChatBotProps> = ({ workflowContext }) => 
           content: msg.text,
         }));
 
+      // Debug: Log context being sent
+      console.log('ChatBot - Sending context:', {
+        hasContext: !!workflowContext,
+        contextKeys: workflowContext ? Object.keys(workflowContext) : [],
+        projectCount: workflowContext?.projects?.length || 0,
+        modelCount: workflowContext?.modelRegistry?.length || 0,
+      });
+
       // Call Gemini API
       const responseText = await sendMessageToClaude(
         userMessage,

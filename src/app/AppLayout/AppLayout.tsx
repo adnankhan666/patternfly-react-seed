@@ -25,7 +25,7 @@ import { BarsIcon } from '@patternfly/react-icons';
 import { useNavigationData, isNavDataGroup, NavDataItem, NavDataHref, NavDataGroup } from '@app/navData';
 import { ChatBot } from '../ChatBot/ChatBot';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { allData } from '../data';
+import { useAppData } from '../hooks/useAppData';
 import { useSidebar } from '../contexts/SidebarContext';
 
 interface IAppLayout {
@@ -34,6 +34,7 @@ interface IAppLayout {
 
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const { sidebarOpen, toggleSidebar } = useSidebar();
+  const { appData } = useAppData(); // Fetch real-time data from API
   const masthead = (
     <Masthead>
       <MastheadMain>
@@ -159,8 +160,8 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         {children}
       </Page>
 
-      {/* Global ChatBot with all application data */}
-      <ChatBot workflowContext={allData} />
+      {/* Global ChatBot with real-time application data from API */}
+      <ChatBot workflowContext={appData} />
     </>
   );
 };

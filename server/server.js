@@ -4,12 +4,22 @@ const dotenv = require('dotenv');
 const path = require('path');
 const apiRouter = require('./api');
 const { connectDB } = require('./database');
+const { seedDatabase } = require('./seed');
 
 // Load environment variables
 dotenv.config();
 
-// Connect to database
-connectDB();
+// Connect to database and seed if needed
+connectDB().then(async () => {
+  // Auto-seed database if AUTO_SEED is enabled and database is empty
+  if (process.env.AUTO_SEED !== 'false') {
+    try {
+      await seedDatabase();
+    } catch (error) {
+      console.error('⚠️  Error during auto-seeding:', error.message);
+    }
+  }
+});
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
