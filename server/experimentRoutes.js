@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Experiment = require('./models/Experiment');
 const { isDBConnected } = require('./database');
+const { validate, experimentSchemas } = require('./validators');
 
 // In-memory storage (fallback when database is not connected)
 let experiments = [];
@@ -75,7 +76,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/experiments - Create new experiment
-router.post('/', async (req, res) => {
+router.post('/', validate(experimentSchemas.create), async (req, res) => {
   try {
     const {
       name,
@@ -138,7 +139,7 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/experiments/:id/status - Update experiment status
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', validate(experimentSchemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;

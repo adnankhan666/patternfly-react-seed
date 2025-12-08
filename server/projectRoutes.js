@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Project = require('./models/Project');
 const { isDBConnected } = require('./database');
+const { validate, projectSchemas } = require('./validators');
 
 // In-memory storage (fallback when database is not connected)
 let projects = [];
@@ -82,7 +83,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/projects - Create new project
-router.post('/', async (req, res) => {
+router.post('/', validate(projectSchemas.create), async (req, res) => {
   try {
     const { name, displayName, description = '', owner, tags = [], collaborators = [] } = req.body;
 
@@ -151,7 +152,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/projects/:id - Update project
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(projectSchemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const { displayName, description, tags, collaborators, workflowCount } = req.body;

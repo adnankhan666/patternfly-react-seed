@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TrainingJob = require('./models/TrainingJob');
 const { isDBConnected } = require('./database');
+const { validate, trainingJobSchemas } = require('./validators');
 
 let trainingJobs = [];
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validate(trainingJobSchemas.create), async (req, res) => {
   try {
     const {
       name,
@@ -101,7 +102,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', validate(trainingJobSchemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Execution = require('./models/Execution');
 const { isDBConnected } = require('./database');
+const { validate, executionSchemas } = require('./validators');
 
 // In-memory storage (fallback when database is not connected)
 let executions = [];
@@ -118,26 +119,9 @@ router.get('/workflow/:workflowId', async (req, res) => {
 });
 
 // POST /api/executions - Create new execution (trigger workflow)
-router.post('/', async (req, res) => {
+router.post('/', validate(executionSchemas.create), async (req, res) => {
   try {
     const { workflowId, workflowName, triggeredBy, steps = [] } = req.body;
-
-    // Validation
-    if (!workflowId || typeof workflowId !== 'string') {
-      return res.status(400).json({ error: 'Workflow ID is required and must be a string' });
-    }
-
-    if (!workflowName || typeof workflowName !== 'string') {
-      return res.status(400).json({ error: 'Workflow name is required and must be a string' });
-    }
-
-    if (!triggeredBy || typeof triggeredBy !== 'string') {
-      return res.status(400).json({ error: 'Triggered by is required and must be a string' });
-    }
-
-    if (!Array.isArray(steps)) {
-      return res.status(400).json({ error: 'Steps must be an array' });
-    }
 
     const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -185,7 +169,7 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/executions/:id/status - Update execution status
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', validate(executionSchemas.updateStatus), async (req, res) => {
   try {
     const { id } = req.params;
     const { status, steps, endTime } = req.body;

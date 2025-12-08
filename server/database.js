@@ -19,6 +19,10 @@ const connectDB = async () => {
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      // Connection pooling configuration
+      maxPoolSize: 10,           // Maximum number of connections in the pool
+      minPoolSize: 5,            // Minimum number of connections to maintain
+      maxIdleTimeMS: 30000,      // Close connections that have been idle for 30 seconds
     };
 
     await mongoose.connect(MONGODB_URI, options);

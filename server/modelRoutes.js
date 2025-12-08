@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const RegisteredModel = require('./models/RegisteredModel');
 const { isDBConnected } = require('./database');
+const { validate, modelSchemas } = require('./validators');
 
 // In-memory storage (fallback when database is not connected)
 let models = [];
@@ -82,23 +83,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/models - Register new model
-router.post('/', async (req, res) => {
+router.post('/', validate(modelSchemas.create), async (req, res) => {
   try {
     const { name, owner, state = 'LIVE', description = '', customProperties = {}, externalID = '' } = req.body;
-
-    // Validation
-    if (!name || typeof name !== 'string') {
-      return res.status(400).json({ error: 'Name is required and must be a string' });
-    }
-
-    if (!owner || typeof owner !== 'string') {
-      return res.status(400).json({ error: 'Owner is required and must be a string' });
-    }
-
-    const validStates = ['LIVE', 'ARCHIVED', 'UNKNOWN'];
-    if (!validStates.includes(state)) {
-      return res.status(400).json({ error: `State must be one of: ${validStates.join(', ')}` });
-    }
 
     const modelId = `model-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -142,7 +129,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/models/:id - Update model
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(modelSchemas.update), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, customProperties, externalID } = req.body;

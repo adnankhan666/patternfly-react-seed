@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Pipeline = require('./models/Pipeline');
 const { isDBConnected } = require('./database');
+const { validate, pipelineSchemas } = require('./validators');
 
 let pipelines = [];
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validate(pipelineSchemas.create), async (req, res) => {
   try {
     const {
       name,

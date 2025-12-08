@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Notebook = require('./models/Notebook');
 const { isDBConnected } = require('./database');
+const { validate, notebookSchemas } = require('./validators');
 
 let notebooks = [];
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validate(notebookSchemas.create), async (req, res) => {
   try {
     const {
       name,

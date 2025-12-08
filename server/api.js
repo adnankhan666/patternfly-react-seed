@@ -1,5 +1,6 @@
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { authMiddleware } = require('./middleware/auth');
 const workflowRoutes = require('./workflowRoutes');
 const authRoutes = require('./authRoutes');
 const projectRoutes = require('./projectRoutes');
@@ -23,29 +24,15 @@ const router = express.Router();
 // Authentication routes (public)
 router.use('/auth', authRoutes);
 
-// Workflow routes
-router.use('/workflows', workflowRoutes);
-
-// Project routes
-router.use('/projects', projectRoutes);
-
-// Execution routes
-router.use('/executions', executionRoutes);
-
-// Model routes
-router.use('/models', modelRoutes);
-
-// Pipeline routes
-router.use('/pipelines', pipelineRoutes);
-
-// Experiment routes
-router.use('/experiments', experimentRoutes);
-
-// Notebook routes
-router.use('/notebooks', notebookRoutes);
-
-// Training routes
-router.use('/training', trainingRoutes);
+// Protected routes - require authentication
+router.use('/workflows', authMiddleware, workflowRoutes);
+router.use('/projects', authMiddleware, projectRoutes);
+router.use('/executions', authMiddleware, executionRoutes);
+router.use('/models', authMiddleware, modelRoutes);
+router.use('/pipelines', authMiddleware, pipelineRoutes);
+router.use('/experiments', authMiddleware, experimentRoutes);
+router.use('/notebooks', authMiddleware, notebookRoutes);
+router.use('/training', authMiddleware, trainingRoutes);
 
 // Initialize Google Generative AI client
 const getGeminiClient = () => {
@@ -172,14 +159,22 @@ async function fetchFreshContext() {
   }
 }
 
-// POST /api/chat - Send message to Gemini AI
-router.post('/chat', async (req, res) => {
+// POST /api/chat - Send message to Gemini AI (Protected endpoint)
+router.post('/chat', authMiddleware, async (req, res) => {
   try {
     const { message, conversationHistory } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required and must be a string' });
     }
+
+    // Input validation - prevent excessively long messages
+    if (message.length > 4000) {
+      return res.status(400).json({ error: 'Message is too long. Maximum 4000 characters allowed.' });
+    }
+
+    // Sanitize message - trim whitespace
+    const sanitizedMessage = message.trim();
 
     const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
@@ -258,6 +253,10 @@ REMEMBER: Only use data from the === sections above. Never invent data.`;
       parts: [{ text: msg.content }],
     }));
 
+    // For first message, prepend system instruction to establish context
+    // For subsequent messages, use history which already has the context
+    const isFirstMessage = !conversationHistory || conversationHistory.length === 0;
+
     // Start a chat with history
     const chat = model.startChat({
       history: history,
@@ -269,12 +268,14 @@ REMEMBER: Only use data from the === sections above. Never invent data.`;
       },
     });
 
-    // Send the user message with system instruction prepended to first message
-    const prompt = conversationHistory && conversationHistory.length === 0
-      ? `${systemInstruction}\n\nUser: ${message}`
-      : message;
+    // Send the message
+    // For first message: include system instruction as context (not mixed with user input)
+    // For follow-ups: send sanitized user message only (context is in history)
+    const messageToSend = isFirstMessage
+      ? `${systemInstruction}\n\n---USER MESSAGE---\n${sanitizedMessage}`
+      : sanitizedMessage;
 
-    const result = await chat.sendMessage(prompt);
+    const result = await chat.sendMessage(messageToSend);
     const response = await result.response;
     const text = response.text();
 
