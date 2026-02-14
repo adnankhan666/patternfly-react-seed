@@ -31,10 +31,32 @@ export const WorkflowNode: React.FunctionComponent<WorkflowNodeProps> = React.me
 }) => {
   const nodeStatus = isExecuting ? 'executing' : isCompleted ? 'completed' : 'idle';
   const nodeStateLabel = isExecuting ? ', currently executing' : isCompleted ? ', completed' : '';
+  
+  // Detect if this is a Helm node
+  const isHelmNode = !!node.data?.helmConfig;
+  const helmConfig = node.data?.helmConfig;
+  
+  // Check if Helm node is configured (has required fields)
+  const isConfigured = isHelmNode && helmConfig?.values && Object.keys(helmConfig.values).length > 0;
+  const configStatus = isConfigured ? 'configured' : 'unconfigured';
+  
+  // Get resource kind for Helm nodes
+  const getResourceKind = (type: string): string => {
+    const kindMap: Record<string, string> = {
+      'oci-secret': 'Secret',
+      'serving-runtime': 'ServingRuntime',
+      'inference-service': 'InferenceService',
+      'pvc': 'PVC',
+      'rbac': 'RBAC',
+      'notebook': 'Notebook',
+      'job': 'Job',
+    };
+    return kindMap[type] || '';
+  };
 
   return (
     <div
-      className={`workflow-node ${isSelected ? 'selected' : ''} ${isExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''}`}
+      className={`workflow-node ${isSelected ? 'selected' : ''} ${isExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''} ${isHelmNode ? 'helm-node' : ''}`}
       style={{
         left: node.position.x,
         top: node.position.y,
@@ -77,7 +99,21 @@ export const WorkflowNode: React.FunctionComponent<WorkflowNodeProps> = React.me
       </div>
 
       <div className="node-header" style={{ backgroundColor: node.data?.color }}>
-        <span className="node-label" id={`node-label-${node.id}`}>{node.label}</span>
+        <span className="node-label" id={`node-label-${node.id}`}>
+          {node.label}
+          {isHelmNode && (
+            <span className="k8s-resource-badge" title={`Kubernetes ${getResourceKind(node.type)}`}>
+              {getResourceKind(node.type)}
+            </span>
+          )}
+        </span>
+        {isHelmNode && (
+          <span 
+            className={`config-status-indicator ${configStatus}`}
+            title={isConfigured ? 'Configured' : 'Needs configuration'}
+            aria-label={isConfigured ? 'Resource is configured' : 'Resource needs configuration'}
+          />
+        )}
         <button
           className="node-delete"
           onClick={onDelete}

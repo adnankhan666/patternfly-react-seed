@@ -11,3 +11,4 @@ export { ContextMenu } from './ContextMenu';
 export { KeyboardShortcutsPanel } from './KeyboardShortcutsPanel';
 export { WorkflowMinimap } from './WorkflowMinimap';
 export { TemplateSelector } from './TemplateSelector';
+export { HelmConfigForm } from './HelmConfigForm';

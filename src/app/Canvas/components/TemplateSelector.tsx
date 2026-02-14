@@ -61,6 +61,7 @@ export const TemplateSelector: React.FunctionComponent<TemplateSelectorProps> = 
         <Tab eventKey="data-processing" title={<TabTitleText>Data Processing</TabTitleText>} />
         <Tab eventKey="deployment" title={<TabTitleText>Deployment</TabTitleText>} />
         <Tab eventKey="monitoring" title={<TabTitleText>Monitoring</TabTitleText>} />
+        <Tab eventKey="helm-quickstart" title={<TabTitleText>Helm Quickstart</TabTitleText>} />
       </Tabs>
 
       <div style={{ marginTop: '24px', maxHeight: '500px', overflowY: 'auto' }}>

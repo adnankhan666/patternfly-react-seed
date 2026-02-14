@@ -4,7 +4,7 @@ export interface WorkflowTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'ml-pipeline' | 'data-processing' | 'deployment' | 'monitoring';
+  category: 'ml-pipeline' | 'data-processing' | 'deployment' | 'monitoring' | 'helm-quickstart';
   nodes: Array<{
     id: string;
     type: string;
@@ -309,6 +309,183 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       { id: 'conn-3', source: 'node-drift-detection', target: 'node-alerts', sourceConnector: 'right', targetConnector: 'left' },
       { id: 'conn-4', source: 'node-drift-detection', target: 'node-retrain', sourceConnector: 'bottom', targetConnector: 'top' },
       { id: 'conn-5', source: 'node-retrain', target: 'node-redeploy', sourceConnector: 'right', targetConnector: 'left' },
+    ],
+  },
+  {
+    id: 'whisper-speech-to-text',
+    name: 'Whisper Speech-to-Text Deployment',
+    description: 'Complete Helm deployment for Whisper speech-to-text model with KServe, workbench, and git clone automation',
+    category: 'helm-quickstart',
+    icon: '🎤',
+    nodes: [
+      // Level 0 nodes (no dependencies)
+      {
+        id: 'node-oci-secret',
+        type: 'oci-secret',
+        label: 'OCI Secret',
+        position: { x: 50, y: 100 },
+        data: {
+          color: '#f59e0b',
+          description: 'Stores OCI model URI',
+          helmConfig: {
+            resourceType: 'oci-secret',
+            values: {
+              name: 'whisper-large-v3-oci',
+              uri: 'oci://quay.io/redhat-ai-services/modelcar-catalog:whisper-large-v3',
+              connectionType: 'uri-v1',
+            },
+          },
+        },
+      },
+      {
+        id: 'node-serving-runtime',
+        type: 'serving-runtime',
+        label: 'ServingRuntime',
+        position: { x: 300, y: 100 },
+        data: {
+          color: '#ef4444',
+          description: 'vLLM GPU runtime',
+          helmConfig: {
+            resourceType: 'serving-runtime',
+            values: {
+              name: 'whisper-large-v3',
+              imageRepo: 'quay.io/vllm/vllm-cuda',
+              imageTag: '0.9.2.2',
+              imagePullPolicy: 'IfNotPresent',
+              port: 8080,
+              runtimeVersion: 'v0.9.2.2',
+            },
+          },
+        },
+      },
+      {
+        id: 'node-pvc',
+        type: 'pvc',
+        label: 'Workbench PVC',
+        position: { x: 550, y: 100 },
+        data: {
+          color: '#06b6d4',
+          description: 'Persistent storage',
+          helmConfig: {
+            resourceType: 'pvc',
+            values: {
+              name: 'whisper-workbench-storage',
+              size: '20Gi',
+              storageClassName: 'gp3-csi',
+              accessMode: 'ReadWriteOnce',
+            },
+          },
+        },
+      },
+      {
+        id: 'node-rbac',
+        type: 'rbac',
+        label: 'RBAC',
+        position: { x: 800, y: 100 },
+        data: {
+          color: '#f97316',
+          description: 'ServiceAccount + Role',
+          helmConfig: {
+            resourceType: 'rbac',
+            values: {
+              serviceAccountName: 'whisper-workbench',
+              roleName: 'whisper-workbench-pod-exec',
+              roleBindingName: 'whisper-workbench-exec',
+            },
+          },
+        },
+      },
+      // Level 1 nodes (depend on Level 0)
+      {
+        id: 'node-inference-service',
+        type: 'inference-service',
+        label: 'InferenceService',
+        position: { x: 175, y: 300 },
+        data: {
+          color: '#8b5cf6',
+          description: 'Model deployment',
+          helmConfig: {
+            resourceType: 'inference-service',
+            values: {
+              name: 'whisper-large-v3',
+              runtime: 'whisper-large-v3',
+              modelFormat: 'vLLM',
+              storageUri: 'oci://quay.io/redhat-ai-services/modelcar-catalog:whisper-large-v3',
+              cpuRequest: '4',
+              memoryRequest: '8Gi',
+              gpuRequest: '1',
+              cpuLimit: '8',
+              memoryLimit: '10Gi',
+              gpuLimit: '1',
+              minReplicas: 1,
+              maxReplicas: 1,
+              tolerations: [
+                {
+                  key: 'nvidia.com/gpu',
+                  operator: 'Exists',
+                  effect: 'NoSchedule',
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        id: 'node-notebook',
+        type: 'notebook',
+        label: 'Workbench Notebook',
+        position: { x: 675, y: 300 },
+        data: {
+          color: '#ec4899',
+          description: 'Jupyter workbench',
+          helmConfig: {
+            resourceType: 'notebook',
+            values: {
+              name: 'whisper-workbench',
+              image: 'image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/s2i-generic-data-science-notebook:2025.1',
+              cpuRequest: '3',
+              memoryRequest: '24Gi',
+              cpuLimit: '6',
+              memoryLimit: '24Gi',
+              pvcName: 'whisper-workbench-storage',
+              serviceAccountName: 'whisper-workbench',
+            },
+          },
+        },
+      },
+      // Level 2 node (depends on notebook)
+      {
+        id: 'node-clone-job',
+        type: 'job',
+        label: 'Git Clone Job',
+        position: { x: 675, y: 500 },
+        data: {
+          color: '#22c55e',
+          description: 'Clone demo repo',
+          helmConfig: {
+            resourceType: 'job',
+            values: {
+              name: 'whisper-workbench-clone-repo',
+              gitRepoUrl: 'https://github.com/Sheryl-shiyi/Basic-speech-to-text-with-Whisper.git',
+              notebookName: 'whisper-workbench',
+              serviceAccountName: 'whisper-workbench',
+              backoffLimit: 3,
+            },
+          },
+        },
+      },
+    ],
+    connections: [
+      // Secret -> InferenceService
+      { id: 'conn-1', source: 'node-oci-secret', target: 'node-inference-service', sourceConnector: 'bottom', targetConnector: 'top' },
+      // ServingRuntime -> InferenceService
+      { id: 'conn-2', source: 'node-serving-runtime', target: 'node-inference-service', sourceConnector: 'bottom', targetConnector: 'top' },
+      // PVC -> Notebook
+      { id: 'conn-3', source: 'node-pvc', target: 'node-notebook', sourceConnector: 'bottom', targetConnector: 'top' },
+      // RBAC -> Notebook
+      { id: 'conn-4', source: 'node-rbac', target: 'node-notebook', sourceConnector: 'bottom', targetConnector: 'top' },
+      // Notebook -> Job
+      { id: 'conn-5', source: 'node-notebook', target: 'node-clone-job', sourceConnector: 'bottom', targetConnector: 'top' },
     ],
   },
 ];

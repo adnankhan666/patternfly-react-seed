@@ -124,3 +124,79 @@ export const NODE_TYPES: WorkflowNode[] = [
     color: '#06b6d4',
   },
 ];
+
+// Helm resource types (1:1 with Helm template files)
+export type HelmResourceType =
+  | 'oci-secret'
+  | 'serving-runtime'
+  | 'inference-service'
+  | 'pvc'
+  | 'rbac'
+  | 'notebook'
+  | 'job';
+
+// Config shapes per resource type
+export interface HelmGlobalValues {
+  namespace: string;
+  chartName: string;
+  chartVersion: string;
+  appVersion: string;
+}
+
+export interface HelmNodeConfig {
+  resourceType: HelmResourceType;
+  values: Record<string, any>;
+}
+
+// Helm-specific node types for Kubernetes resources
+export const HELM_NODE_TYPES: WorkflowNode[] = [
+  {
+    id: 'oci-secret',
+    type: 'action',
+    name: 'OCI Secret',
+    description: 'Stores OCI model URI as a K8s Secret',
+    color: '#f59e0b',
+  },
+  {
+    id: 'serving-runtime',
+    type: 'action',
+    name: 'ServingRuntime',
+    description: 'vLLM GPU runtime definition (KServe)',
+    color: '#ef4444',
+  },
+  {
+    id: 'inference-service',
+    type: 'action',
+    name: 'InferenceService',
+    description: 'Model deployment with KServe',
+    color: '#8b5cf6',
+  },
+  {
+    id: 'pvc',
+    type: 'action',
+    name: 'PVC',
+    description: 'Persistent storage for workbench',
+    color: '#06b6d4',
+  },
+  {
+    id: 'rbac',
+    type: 'action',
+    name: 'RBAC',
+    description: 'ServiceAccount + Role + RoleBinding',
+    color: '#f97316',
+  },
+  {
+    id: 'notebook',
+    type: 'action',
+    name: 'Notebook',
+    description: 'Kubeflow Jupyter notebook workbench',
+    color: '#ec4899',
+  },
+  {
+    id: 'job',
+    type: 'action',
+    name: 'Clone Job',
+    description: 'Git clone job into notebook pod',
+    color: '#22c55e',
+  },
+];

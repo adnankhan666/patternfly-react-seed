@@ -14,10 +14,36 @@ export const NodeSizeSchema = z.object({
   height: z.number().min(60).max(800),
 });
 
+// Helm resource type schema
+export const HelmResourceTypeSchema = z.enum([
+  'oci-secret',
+  'serving-runtime',
+  'inference-service',
+  'pvc',
+  'rbac',
+  'notebook',
+  'job',
+]);
+
+// Helm global values schema
+export const HelmGlobalValuesSchema = z.object({
+  namespace: z.string().min(1),
+  chartName: z.string().min(1),
+  chartVersion: z.string().min(1),
+  appVersion: z.string().min(1),
+});
+
+// Helm node config schema
+export const HelmNodeConfigSchema = z.object({
+  resourceType: HelmResourceTypeSchema,
+  values: z.record(z.any()),
+});
+
 // Node data schema
 export const NodeDataSchemaData = z.object({
   color: z.string().optional(),
   description: z.string().optional(),
+  helmConfig: HelmNodeConfigSchema.optional(),
 });
 
 // Position schema
@@ -76,6 +102,9 @@ export type WorkflowStateType = z.infer<typeof WorkflowStateSchema>;
 export type WorkflowFileType = z.infer<typeof WorkflowFileSchema>;
 export type WorkflowNodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 export type ConnectorPositionType = z.infer<typeof ConnectorPositionSchema>;
+export type HelmResourceTypeType = z.infer<typeof HelmResourceTypeSchema>;
+export type HelmGlobalValuesType = z.infer<typeof HelmGlobalValuesSchema>;
+export type HelmNodeConfigType = z.infer<typeof HelmNodeConfigSchema>;
 
 /**
  * Validation helper functions
@@ -108,4 +137,14 @@ export const strictValidateWorkflowFile = (data: unknown): WorkflowFileType => {
 
 export const strictValidateWorkflowState = (data: unknown): WorkflowStateType => {
   return WorkflowStateSchema.parse(data);
+};
+
+// Validate Helm config
+export const validateHelmConfig = (data: unknown) => {
+  return HelmNodeConfigSchema.safeParse(data);
+};
+
+// Validate Helm global values
+export const validateHelmGlobalValues = (data: unknown) => {
+  return HelmGlobalValuesSchema.safeParse(data);
 };

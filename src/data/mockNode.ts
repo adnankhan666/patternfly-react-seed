@@ -50,6 +50,42 @@ export const NODE_CONFIGS = {
     defaultLabel: 'Feature Store',
     description: 'Manage ML features',
   },
+  // Helm resource node types
+  'oci-secret': {
+    color: '#f59e0b',
+    defaultLabel: 'OCI Secret',
+    description: 'Stores OCI model URI as a K8s Secret',
+  },
+  'serving-runtime': {
+    color: '#ef4444',
+    defaultLabel: 'ServingRuntime',
+    description: 'vLLM GPU runtime definition (KServe)',
+  },
+  'inference-service': {
+    color: '#8b5cf6',
+    defaultLabel: 'InferenceService',
+    description: 'Model deployment with KServe',
+  },
+  'pvc': {
+    color: '#06b6d4',
+    defaultLabel: 'PVC',
+    description: 'Persistent storage for workbench',
+  },
+  'rbac': {
+    color: '#f97316',
+    defaultLabel: 'RBAC',
+    description: 'ServiceAccount + Role + RoleBinding',
+  },
+  'notebook': {
+    color: '#ec4899',
+    defaultLabel: 'Notebook',
+    description: 'Kubeflow Jupyter notebook workbench',
+  },
+  'job': {
+    color: '#22c55e',
+    defaultLabel: 'Clone Job',
+    description: 'Git clone job into notebook pod',
+  },
 };
 
 type MockNodeType = {

@@ -55,7 +55,7 @@ import {
   MapIcon,
 } from '@patternfly/react-icons';
 import { Alert, AlertGroup, AlertActionCloseButton, AlertVariant } from '@patternfly/react-core';
-import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition } from './types';
+import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition, HelmGlobalValues } from './types';
 import {
   DEFAULT_NODE_WIDTH,
   DEFAULT_NODE_HEIGHT,
@@ -71,9 +71,12 @@ import {
   GRID_SIZE,
   GRID_ENABLED_DEFAULT,
 } from './constants';
-import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector } from './components';
+import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm } from './components';
 import { saveWorkflowState, loadWorkflowState } from '../../services/workflowService';
 import { WorkflowTemplate } from '../../data/workflowTemplates';
+import { generateHelmNodeYaml } from './utils/helmYamlGenerator';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-yaml';
 import { mockTelemetryData } from '../../data/mockTelemetry';
 import {
   Chart,
@@ -166,6 +169,16 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const [spacePressed, setSpacePressed] = React.useState(false);
   const MIN_ZOOM = 0.25;
   const MAX_ZOOM = 2;
+
+  // Helm mode state
+  const [helmMode, setHelmMode] = React.useState(false);
+  const [helmGlobalValues, setHelmGlobalValues] = React.useState<HelmGlobalValues>({
+    namespace: 'whisper-proj',
+    chartName: 'whisper-quickstart',
+    chartVersion: '1.0.0',
+    appVersion: 'whisper-large-v3',
+  });
+  const [drawerActiveTab, setDrawerActiveTab] = React.useState<string | number>(0);
 
   // Zoom control handlers (memoized with useCallback)
   const handleZoomIn = React.useCallback(() => {
@@ -1325,6 +1338,10 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   // Handle template selection (memoized with useCallback)
   const handleSelectTemplate = React.useCallback((template: WorkflowTemplate) => {
     try {
+      // Check if this is a Helm template
+      const isHelmTemplate = template.category === 'helm-quickstart';
+      setHelmMode(isHelmTemplate);
+      
       // Convert template nodes to NodeData format
       const templateNodes: NodeData[] = template.nodes.map((node) => ({
         id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -1931,6 +1948,113 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                         );
                       }
 
+                      // Check if this is a Helm node
+                      const isHelmNode = !!node.data?.helmConfig;
+                      
+                      // Show Helm-specific tabs for Helm nodes
+                      if (isHelmNode) {
+                        const helmConfig = node.data?.helmConfig;
+                        const yamlContent = generateHelmNodeYaml(
+                          helmConfig?.resourceType || '',
+                          helmConfig?.values || {},
+                          helmGlobalValues
+                        );
+                        const highlightedYaml = Prism.highlight(yamlContent, Prism.languages.yaml, 'yaml');
+
+                        return (
+                          <Tabs
+                            activeKey={drawerActiveTab}
+                            onSelect={(event, tabIndex) => setDrawerActiveTab(tabIndex)}
+                            aria-label="Helm node details tabs"
+                          >
+                            <Tab eventKey={0} title={<TabTitleText>Summary</TabTitleText>}>
+                              <div style={{ padding: '16px' }}>
+                                <FormGroup label="Resource Type">
+                                  <TextInput value={helmConfig?.resourceType || ''} isDisabled aria-label="Resource Type" />
+                                </FormGroup>
+                                <FormGroup label="Node ID">
+                                  <TextInput value={node.id} isDisabled aria-label="Node ID" />
+                                </FormGroup>
+                                <FormGroup label="Label">
+                                  <TextInput
+                                    value={node.label}
+                                    onChange={(e, val) => {
+                                      setNodes(
+                                        nodes.map((n) =>
+                                          n.id === selectedNode ? { ...n, label: val } : n,
+                                        ),
+                                      );
+                                    }}
+                                    aria-label="Node Label"
+                                  />
+                                </FormGroup>
+                                <FormGroup label="Description">
+                                  <TextArea
+                                    value={node.data?.description || ''}
+                                    onChange={(e, val) => {
+                                      setNodes(
+                                        nodes.map((n) =>
+                                          n.id === selectedNode
+                                            ? { ...n, data: { ...n.data, description: val } }
+                                            : n,
+                                        ),
+                                      );
+                                    }}
+                                    aria-label="Node Description"
+                                    rows={4}
+                                  />
+                                </FormGroup>
+                                <FormGroup label="Namespace">
+                                  <TextInput value={helmGlobalValues.namespace} isDisabled aria-label="Namespace" />
+                                </FormGroup>
+                              </div>
+                            </Tab>
+                            <Tab eventKey={1} title={<TabTitleText>Configure</TabTitleText>}>
+                              <div style={{ padding: '16px', maxHeight: '600px', overflowY: 'auto' }}>
+                                <HelmConfigForm
+                                  resourceType={helmConfig?.resourceType as any}
+                                  config={helmConfig?.values || {}}
+                                  onChange={(newConfig) => {
+                                    setNodes(
+                                      nodes.map((n) =>
+                                        n.id === selectedNode
+                                          ? {
+                                              ...n,
+                                              data: {
+                                                ...n.data,
+                                                helmConfig: {
+                                                  ...helmConfig,
+                                                  values: newConfig,
+                                                },
+                                              },
+                                            }
+                                          : n,
+                                      ),
+                                    );
+                                  }}
+                                />
+                              </div>
+                            </Tab>
+                            <Tab eventKey={2} title={<TabTitleText>YAML</TabTitleText>}>
+                              <div style={{ padding: '16px' }}>
+                                <pre style={{
+                                  backgroundColor: '#1e1e1e',
+                                  color: '#d4d4d4',
+                                  padding: '16px',
+                                  borderRadius: '4px',
+                                  overflow: 'auto',
+                                  maxHeight: '600px',
+                                  fontSize: '12px',
+                                  lineHeight: '1.5',
+                                }}>
+                                  <code dangerouslySetInnerHTML={{ __html: highlightedYaml }} />
+                                </pre>
+                              </div>
+                            </Tab>
+                          </Tabs>
+                        );
+                      }
+
                       // Default: Show standard Properties/Logs tabs for other node types
                       return (
                         <Tabs
@@ -2030,23 +2154,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             <DrawerContentBody>
               <div className="workflow-container">
                 {/* Node Panel */}
-                <div className="node-panel">
-                  <h3 className="node-panel-title">Nodes</h3>
-                  <div className="node-list">
-                    {NODE_TYPES.map((nodeType) => (
-                      <div
-                        key={nodeType.id}
-                        className="node-type"
-                        draggable
-                        onDragStart={(e) => handleDragStart(nodeType, e)}
-                        style={{ borderLeftColor: nodeType.color }}
-                      >
-                        <div className="node-type-name">{nodeType.name}</div>
-                        <div className="node-type-description">{nodeType.description}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <NodePanel onDragStart={handleDragStart} helmMode={helmMode} />
 
                 {/* Canvas */}
                 <div
