@@ -440,3 +440,381 @@
 .pf-v6-theme-dark .action-bubble {
   border-color: #2b2b2b;
 }
+
+/* Helm-specific styles */
+.k8s-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.k8s-resource-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+  margin-right: 4px;
+}
+
+.config-status-indicator.configured {
+  background-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.config-status-indicator.unconfigured {
+  background-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.workflow-node.helm-node {
+  border-width: 2px;
+}
+
+.workflow-node.helm-node .node-header {
+  font-size: 13px;
+}
+
+/* Dark theme adjustments for Helm elements */
+.pf-v6-theme-dark .k8s-badge {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.pf-v6-theme-dark .k8s-resource-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Helm Deployment Overlay Styles */
+.execution-overlay.helm-deployment {
+  width: 600px !important;
+  min-height: 800px;
+  max-height: 1400px;
+  height: auto;
+}
+
+.deployment-phase {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3b82f6;
+  margin: 8px 0 4px 0;
+}
+
+.deployment-phase-desc {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.phase-progress-container {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.phase-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  transition: width 0.5s ease;
+  border-radius: 4px;
+}
+
+.deployment-logs {
+  flex: 1;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  min-height: 0;
+}
+
+.deployment-log-entry {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  align-items: baseline;
+}
+
+.log-time {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.log-node {
+  color: #8b5cf6;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.log-message {
+  color: #d4d4d4;
+  flex: 1;
+}
+
+.deployment-log-entry.log-success .log-message {
+  color: #10b981;
+}
+
+.deployment-log-entry.log-warning .log-message {
+  color: #f59e0b;
+}
+
+.deployment-log-entry.log-error .log-message {
+  color: #ef4444;
+}
+
+.deployment-logs::-webkit-scrollbar {
+  width: 6px;
+}
+
+.deployment-logs::-webkit-scrollbar-track {
+  background: #2b2b2b;
+  border-radius: 3px;
+}
+
+.deployment-logs::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+.deployment-logs::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* n8n-style node animations */
+
+/* Circular ripple effect emanating from node center */
+@keyframes n8n-ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Rotating radar scan effect */
+@keyframes n8n-radar {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulsing glow effect */
+@keyframes n8n-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
+/* Success flash */
+@keyframes n8n-success-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+/* Processing data animation */
+@keyframes n8n-processing {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Workflow node positioning to allow pseudo-elements */
+.workflow-node {
+  position: absolute;
+  overflow: visible;
+}
+
+/* Ripple effect overlay for executing nodes */
+.workflow-node.executing::before,
+.workflow-node.deploying::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 3px solid rgba(59, 130, 246, 0.6);
+  animation: n8n-ripple 1.5s ease-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Second ripple with delay */
+.workflow-node.executing::after,
+.workflow-node.deploying::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 3px solid rgba(59, 130, 246, 0.4);
+  animation: n8n-ripple 1.5s ease-out infinite 0.75s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Validating state - amber ripples */
+.workflow-node.validating::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 3px solid rgba(245, 158, 11, 0.6);
+  animation: n8n-ripple 1.2s ease-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.workflow-node.validating::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 3px solid rgba(245, 158, 11, 0.4);
+  animation: n8n-ripple 1.2s ease-out infinite 0.6s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Processing indicator inside node */
+.workflow-node.executing .node-body::before,
+.workflow-node.deploying .node-body::before,
+.workflow-node.validating .node-body::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: n8n-processing 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.workflow-node.validating .node-body::before {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, transparent 70%);
+}
+
+
+/* Subtle border pulse during execution */
+.workflow-node.executing,
+.workflow-node.deploying {
+  border-color: #3b82f6 !important;
+  border-width: 2px;
+  animation: n8n-pulse 2s ease-in-out infinite;
+}
+
+.workflow-node.validating {
+  border-color: #f59e0b !important;
+  border-width: 2px;
+}
+
+.workflow-node.completed {
+  border-color: #10b981 !important;
+  border-width: 2px;
+}
+
+/* Node body needs position relative for pseudo-element */
+.node-body {
+  position: relative;
+}
+
+/* Connection glow effect */
+.connection-line.active {
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.8));
+  stroke-width: 3;
+  stroke: #3b82f6;
+  animation: connection-flow 1.5s ease-in-out infinite;
+}
+
+@keyframes connection-flow {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Dark theme adjustments */
+.pf-v6-theme-dark .workflow-node.executing::before,
+.pf-v6-theme-dark .workflow-node.deploying::before {
+  border-color: rgba(96, 165, 250, 0.7);
+}
+
+.pf-v6-theme-dark .workflow-node.validating::before {
+  border-color: rgba(251, 191, 36, 0.7);
+}

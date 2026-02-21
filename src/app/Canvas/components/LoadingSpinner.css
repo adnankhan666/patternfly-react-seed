@@ -199,3 +199,22 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* Helm Deployment Overlay - Full canvas height */
+.execution-overlay.helm-deployment {
+  width: 900px !important;
+  min-width: 900px !important;
+  max-width: 900px !important;
+  height: calc(100vh - 260px) !important;
+  max-height: calc(100vh - 260px) !important;
+  top: 250px !important;
+  overflow: hidden;
+}
+
+.execution-overlay.helm-deployment .execution-info {
+  text-align: left;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

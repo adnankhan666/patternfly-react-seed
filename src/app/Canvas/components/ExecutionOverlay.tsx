@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
+import { DeploymentStatus, PHASE_DESCRIPTIONS } from '../types/deploymentPhases';
 import './LoadingSpinner.css';
 
 /**
@@ -18,6 +19,10 @@ interface ExecutionOverlayProps {
   totalNodes: number;
   /** Current execution status message */
   statusMessage?: string;
+  /** Deployment status (for Helm workflows) */
+  deploymentStatus?: DeploymentStatus | null;
+  /** Callback to close the overlay */
+  onClose?: () => void;
 }
 
 export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = React.memo(({
@@ -26,8 +31,18 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
   completedCount,
   totalNodes,
   statusMessage = 'Executing workflow...',
+  deploymentStatus,
+  onClose,
 }) => {
   const pendingCount = totalNodes - completedCount - executingCount;
+  const logsEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-scroll logs to bottom
+  React.useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [deploymentStatus?.logs]);
 
   // Draggable state
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
@@ -89,6 +104,124 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
     return undefined;
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  // Render Helm deployment view
+  if (deploymentStatus) {
+    const phaseInfo = PHASE_DESCRIPTIONS[deploymentStatus.phase];
+    const phasePercent = ((deploymentStatus.phase - 1) / deploymentStatus.totalPhases) * 100;
+
+    return (
+      <div
+        ref={overlayRef}
+        className="execution-overlay helm-deployment"
+        role="status"
+        aria-labelledby="deployment-title"
+        aria-live="polite"
+        onMouseDown={handleMouseDown}
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : 'move',
+          width: '900px',
+          height: 'calc(100vh - 300px)',
+          maxHeight: 'calc(100vh - 300px)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div className="execution-info" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="execution-title" id="deployment-title">
+              {phaseInfo.icon} Helm Deployment
+            </div>
+            {onClose && deploymentStatus.phase === 6 && (
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  padding: '0 4px',
+                }}
+                title="Close"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="deployment-phase">
+            Phase {deploymentStatus.phase}/{deploymentStatus.totalPhases}: {phaseInfo.name}
+          </div>
+          <div className="deployment-phase-desc">{phaseInfo.description}</div>
+
+          {/* Phase Progress Bar */}
+          <div className="phase-progress-container">
+            <div className="phase-progress-bar" style={{ width: `${phasePercent}%` }} />
+          </div>
+
+          {/* Deployment Logs */}
+          <div 
+            className="deployment-logs" 
+            role="log" 
+            aria-live="polite" 
+            aria-atomic="false"
+            style={{
+              flex: '1 1 auto',
+              overflowY: 'scroll',
+              overflowX: 'hidden',
+              minHeight: 0,
+              maxHeight: '100%',
+            }}
+          >
+            {deploymentStatus.logs.slice(-10).map((log) => (
+              <div
+                key={log.id}
+                className={`deployment-log-entry log-${log.type}`}
+                role="status"
+              >
+                <span className="log-time">
+                  {log.timestamp.toLocaleTimeString('en-US', { 
+                    hour12: false, 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                  })}
+                </span>
+                {log.nodeName && <span className="log-node">[{log.nodeName}]</span>}
+                <span className="log-message">{log.message}</span>
+              </div>
+            ))}
+            <div ref={logsEndRef} />
+          </div>
+
+          {/* Stats */}
+          <div className="execution-stats" role="group" aria-label="Deployment statistics">
+            <div className="execution-stat">
+              <div className="execution-stat-value" style={{ color: '#10b981' }}>
+                {completedCount}
+              </div>
+              <div className="execution-stat-label">Ready</div>
+            </div>
+            <div className="execution-stat">
+              <div className="execution-stat-value" style={{ color: '#3b82f6' }}>
+                {executingCount}
+              </div>
+              <div className="execution-stat-label">Deploying</div>
+            </div>
+            <div className="execution-stat">
+              <div className="execution-stat-value" style={{ color: '#9ca3af' }}>
+                {pendingCount}
+              </div>
+              <div className="execution-stat-label">Pending</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard execution view
   return (
     <div
       ref={overlayRef}

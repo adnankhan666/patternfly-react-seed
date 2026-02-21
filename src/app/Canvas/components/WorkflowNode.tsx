@@ -40,6 +40,9 @@ export const WorkflowNode: React.FunctionComponent<WorkflowNodeProps> = React.me
   const isConfigured = isHelmNode && helmConfig?.values && Object.keys(helmConfig.values).length > 0;
   const configStatus = isConfigured ? 'configured' : 'unconfigured';
   
+  // Get deployment state for Helm nodes (if available from deploymentStatus)
+  const deploymentState = node.data?.deploymentState || 'idle'; // Can be: idle, validating, deploying, ready
+  
   // Get resource kind for Helm nodes
   const getResourceKind = (type: string): string => {
     const kindMap: Record<string, string> = {
@@ -56,7 +59,7 @@ export const WorkflowNode: React.FunctionComponent<WorkflowNodeProps> = React.me
 
   return (
     <div
-      className={`workflow-node ${isSelected ? 'selected' : ''} ${isExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''} ${isHelmNode ? 'helm-node' : ''}`}
+      className={`workflow-node ${isSelected ? 'selected' : ''} ${isExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''} ${isHelmNode ? 'helm-node' : ''} ${deploymentState}`}
       style={{
         left: node.position.x,
         top: node.position.y,
@@ -99,21 +102,16 @@ export const WorkflowNode: React.FunctionComponent<WorkflowNodeProps> = React.me
       </div>
 
       <div className="node-header" style={{ backgroundColor: node.data?.color }}>
-        <span className="node-label" id={`node-label-${node.id}`}>
-          {node.label}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+          <span className="node-label" id={`node-label-${node.id}`}>{node.label}</span>
           {isHelmNode && (
-            <span className="k8s-resource-badge" title={`Kubernetes ${getResourceKind(node.type)}`}>
-              {getResourceKind(node.type)}
-            </span>
+            <span 
+              className={`config-status-indicator ${configStatus}`}
+              title={isConfigured ? 'Configured' : 'Needs configuration'}
+              aria-label={isConfigured ? 'Resource is configured' : 'Resource needs configuration'}
+            />
           )}
-        </span>
-        {isHelmNode && (
-          <span 
-            className={`config-status-indicator ${configStatus}`}
-            title={isConfigured ? 'Configured' : 'Needs configuration'}
-            aria-label={isConfigured ? 'Resource is configured' : 'Resource needs configuration'}
-          />
-        )}
+        </div>
         <button
           className="node-delete"
           onClick={onDelete}
@@ -122,7 +120,9 @@ export const WorkflowNode: React.FunctionComponent<WorkflowNodeProps> = React.me
           ✕
         </button>
       </div>
-      <div className="node-body" aria-label="Node description">{node.data?.description}</div>
+      <div className="node-body" aria-label="Node description">
+        {node.data?.description}
+      </div>
       <div
         className="node-resize-handle"
         onMouseDown={onResizeStart}

@@ -53,9 +53,19 @@ import {
   CubesIcon,
   TimesIcon,
   MapIcon,
+  CogIcon,
+  PackageIcon,
 } from '@patternfly/react-icons';
 import { Alert, AlertGroup, AlertActionCloseButton, AlertVariant } from '@patternfly/react-core';
 import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition, HelmGlobalValues } from './types';
+import {
+  DeploymentStatus,
+  DeploymentLog,
+  NodeDeploymentStatus,
+  DEPLOYMENT_PHASES,
+  generateDeploymentLogs,
+  PHASE_DESCRIPTIONS,
+} from './types/deploymentPhases';
 import {
   DEFAULT_NODE_WIDTH,
   DEFAULT_NODE_HEIGHT,
@@ -71,10 +81,11 @@ import {
   GRID_SIZE,
   GRID_ENABLED_DEFAULT,
 } from './constants';
-import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm } from './components';
+import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm, HelmGlobalValuesPopover, HelmExportModal } from './components';
 import { saveWorkflowState, loadWorkflowState } from '../../services/workflowService';
 import { WorkflowTemplate } from '../../data/workflowTemplates';
 import { generateHelmNodeYaml } from './utils/helmYamlGenerator';
+import { downloadHelmChart } from './utils/helmChartExporter';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-yaml';
 import { mockTelemetryData } from '../../data/mockTelemetry';
@@ -159,6 +170,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   // Execution progress tracking
   const [executionProgress, setExecutionProgress] = React.useState(0);
   const [executionStatus, setExecutionStatus] = React.useState<string>('');
+  const [deploymentStatus, setDeploymentStatus] = React.useState<DeploymentStatus | null>(null);
 
   // Zoom and pan state
   const [zoom, setZoom] = React.useState(1);
@@ -179,6 +191,8 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     appVersion: 'whisper-large-v3',
   });
   const [drawerActiveTab, setDrawerActiveTab] = React.useState<string | number>(0);
+  const [showHelmExportModal, setShowHelmExportModal] = React.useState(false);
+  const [savedDeploymentStatus, setSavedDeploymentStatus] = React.useState<DeploymentStatus | null>(null);
 
   // Zoom control handlers (memoized with useCallback)
   const handleZoomIn = React.useCallback(() => {
@@ -1149,6 +1163,57 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     return levels;
   }, [nodes, connections]);
 
+  // Helper to add deployment log
+  const addDeploymentLog = React.useCallback((
+    phase: number,
+    message: string,
+    type: 'info' | 'success' | 'warning' | 'error' = 'info',
+    nodeId?: string,
+    nodeName?: string
+  ) => {
+    setDeploymentStatus(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        logs: [
+          ...prev.logs,
+          {
+            id: `log-${Date.now()}-${Math.random()}`,
+            timestamp: new Date(),
+            phase,
+            nodeId,
+            nodeName,
+            message,
+            type,
+          },
+        ],
+      };
+    });
+  }, []);
+
+  // Update node deployment status
+  const updateNodeStatus = React.useCallback((
+    nodeId: string,
+    state: NodeDeploymentStatus['state'],
+    message: string,
+    substeps: string[] = [],
+    currentSubstep?: number
+  ) => {
+    setDeploymentStatus(prev => {
+      if (!prev) return null;
+      const newStatuses = new Map(prev.nodeStatuses);
+      newStatuses.set(nodeId, { state, message, substeps, currentSubstep });
+      return { ...prev, nodeStatuses: newStatuses };
+    });
+    
+    // Update node visual state for animations
+    setNodes(prevNodes => prevNodes.map(n => 
+      n.id === nodeId 
+        ? { ...n, data: { ...n.data, deploymentState: state } }
+        : n
+    ));
+  }, []);
+
   const handleExecute = React.useCallback(async () => {
     if (nodes.length === 0) {
       addAlert('Cannot execute empty workflow. Add nodes first.', AlertVariant.warning);
@@ -1167,7 +1232,201 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     setParticles([]);
     setExecutionProgress(0);
     setExecutionStatus('Initializing workflow execution...');
+    setDeploymentStatus(null);
 
+    // Check if this is a Helm workflow
+    const helmNodes = nodes.filter(n => n.data?.helmConfig);
+    const isHelmWorkflow = helmNodes.length > 0;
+
+    if (isHelmWorkflow) {
+      // Execute Helm deployment with phases
+      addAlert('Starting Helm deployment...', AlertVariant.info);
+      
+      // Initialize deployment status
+      const initialStatus: DeploymentStatus = {
+        phase: DEPLOYMENT_PHASES.VALIDATE,
+        totalPhases: 6,
+        currentPhaseProgress: 0,
+        logs: [],
+        nodeStatuses: new Map(),
+      };
+      
+      helmNodes.forEach(node => {
+        initialStatus.nodeStatuses.set(node.id, {
+          state: 'pending',
+          message: 'Waiting...',
+          substeps: [],
+        });
+      });
+      
+      setDeploymentStatus(initialStatus);
+
+      // PHASE 1: Validation (5s)
+      addDeploymentLog(DEPLOYMENT_PHASES.VALIDATE, '🔍 Starting pre-flight validation...', 'info');
+      
+      for (const node of helmNodes) {
+        updateNodeStatus(node.id, 'validating', 'Validating configuration...');
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        const resourceType = node.data?.helmConfig?.resourceType;
+        const logs = generateDeploymentLogs(resourceType || '', node.label, DEPLOYMENT_PHASES.VALIDATE);
+        
+        for (const log of logs) {
+          addDeploymentLog(DEPLOYMENT_PHASES.VALIDATE, log, 'info', node.id, node.label);
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
+        updateNodeStatus(node.id, 'pending', 'Validated ✓');
+        addDeploymentLog(DEPLOYMENT_PHASES.VALIDATE, `${node.label} validated successfully`, 'success', node.id, node.label);
+      }
+      
+      addDeploymentLog(DEPLOYMENT_PHASES.VALIDATE, '✅ All validations passed', 'success');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // PHASE 2: Deploy Infrastructure (8s)
+      setDeploymentStatus(prev => prev ? { ...prev, phase: DEPLOYMENT_PHASES.DEPLOY_INFRASTRUCTURE, currentPhaseProgress: 0 } : null);
+      addDeploymentLog(DEPLOYMENT_PHASES.DEPLOY_INFRASTRUCTURE, '🏗️ Deploying infrastructure resources...', 'info');
+      
+      const infraNodes = helmNodes.filter(n =>
+        ['oci-secret', 'serving-runtime', 'pvc', 'rbac'].includes(n.data?.helmConfig?.resourceType || '')
+      );
+      
+      setExecutingNodes(new Set(infraNodes.map(n => n.id)));
+      
+      for (const node of infraNodes) {
+        const resourceType = node.data?.helmConfig?.resourceType;
+        const logs = generateDeploymentLogs(resourceType || '', node.label, DEPLOYMENT_PHASES.DEPLOY_INFRASTRUCTURE);
+        
+        updateNodeStatus(node.id, 'deploying', 'Deploying...', logs, 0);
+        
+        for (let i = 0; i < logs.length; i++) {
+          addDeploymentLog(DEPLOYMENT_PHASES.DEPLOY_INFRASTRUCTURE, logs[i], 'info', node.id, node.label);
+          updateNodeStatus(node.id, 'deploying', 'Deploying...', logs, i);
+          await new Promise(resolve => setTimeout(resolve, 600));
+        }
+        
+        updateNodeStatus(node.id, 'ready', 'Deployed ✓');
+        setCompletedNodes(prev => new Set([...prev, node.id]));
+      }
+      
+      setExecutingNodes(new Set());
+      addDeploymentLog(DEPLOYMENT_PHASES.DEPLOY_INFRASTRUCTURE, '✅ Infrastructure deployed successfully', 'success');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // PHASE 3: Deploy Services (10s)
+      setDeploymentStatus(prev => prev ? { ...prev, phase: DEPLOYMENT_PHASES.DEPLOY_SERVICES, currentPhaseProgress: 0 } : null);
+      addDeploymentLog(DEPLOYMENT_PHASES.DEPLOY_SERVICES, '🚀 Deploying services...', 'info');
+      
+      const serviceNodes = helmNodes.filter(n =>
+        ['inference-service', 'notebook'].includes(n.data?.helmConfig?.resourceType || '')
+      );
+      
+      setExecutingNodes(new Set(serviceNodes.map(n => n.id)));
+      
+      for (const node of serviceNodes) {
+        const resourceType = node.data?.helmConfig?.resourceType;
+        const logs = generateDeploymentLogs(resourceType || '', node.label, DEPLOYMENT_PHASES.DEPLOY_SERVICES);
+        
+        updateNodeStatus(node.id, 'deploying', 'Deploying...', logs, 0);
+        
+        for (let i = 0; i < logs.length; i++) {
+          addDeploymentLog(DEPLOYMENT_PHASES.DEPLOY_SERVICES, logs[i], 'info', node.id, node.label);
+          updateNodeStatus(node.id, 'deploying', 'Deploying...', logs, i);
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+        
+        updateNodeStatus(node.id, 'ready', 'Running ✓');
+        setCompletedNodes(prev => new Set([...prev, node.id]));
+      }
+      
+      setExecutingNodes(new Set());
+      addDeploymentLog(DEPLOYMENT_PHASES.DEPLOY_SERVICES, '✅ Services deployed successfully', 'success');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // PHASE 4: Run Jobs (6s)
+      setDeploymentStatus(prev => prev ? { ...prev, phase: DEPLOYMENT_PHASES.RUN_JOBS, currentPhaseProgress: 0 } : null);
+      addDeploymentLog(DEPLOYMENT_PHASES.RUN_JOBS, '⚙️ Running initialization jobs...', 'info');
+      
+      const jobNodes = helmNodes.filter(n => n.data?.helmConfig?.resourceType === 'job');
+      
+      for (const node of jobNodes) {
+        setExecutingNodes(new Set([node.id]));
+        const logs = generateDeploymentLogs('job', node.label, DEPLOYMENT_PHASES.RUN_JOBS);
+        
+        updateNodeStatus(node.id, 'deploying', 'Running...', logs, 0);
+        
+        for (let i = 0; i < logs.length; i++) {
+          addDeploymentLog(DEPLOYMENT_PHASES.RUN_JOBS, logs[i], 'info', node.id, node.label);
+          updateNodeStatus(node.id, 'deploying', 'Running...', logs, i);
+          await new Promise(resolve => setTimeout(resolve, 700));
+        }
+        
+        updateNodeStatus(node.id, 'ready', 'Completed ✓');
+        setCompletedNodes(prev => new Set([...prev, node.id]));
+      }
+      
+      setExecutingNodes(new Set());
+      addDeploymentLog(DEPLOYMENT_PHASES.RUN_JOBS, '✅ Jobs completed successfully', 'success');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // PHASE 5: Health Checks (4s)
+      setDeploymentStatus(prev => prev ? { ...prev, phase: DEPLOYMENT_PHASES.HEALTH_CHECKS, currentPhaseProgress: 0 } : null);
+      addDeploymentLog(DEPLOYMENT_PHASES.HEALTH_CHECKS, '🏥 Running health checks...', 'info');
+      
+      for (const node of serviceNodes) {
+        const resourceType = node.data?.helmConfig?.resourceType;
+        const logs = generateDeploymentLogs(resourceType || '', node.label, DEPLOYMENT_PHASES.HEALTH_CHECKS);
+        
+        for (const log of logs) {
+          addDeploymentLog(DEPLOYMENT_PHASES.HEALTH_CHECKS, log, 'info', node.id, node.label);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      addDeploymentLog(DEPLOYMENT_PHASES.HEALTH_CHECKS, '✅ All health checks passed', 'success');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // PHASE 6: Ready (2s)
+      setDeploymentStatus(prev => prev ? { ...prev, phase: DEPLOYMENT_PHASES.READY, currentPhaseProgress: 100 } : null);
+      addDeploymentLog(DEPLOYMENT_PHASES.READY, '✅ Deployment complete! All services are ready.', 'success');
+      
+      const inferenceNode = helmNodes.find(n => n.data?.helmConfig?.resourceType === 'inference-service');
+      const notebookNode = helmNodes.find(n => n.data?.helmConfig?.resourceType === 'notebook');
+      
+      if (inferenceNode) {
+        addDeploymentLog(DEPLOYMENT_PHASES.READY, `📡 Model endpoint: http://whisper-large-v3.whisper-proj.svc.cluster.local:8080/v1/audio/transcriptions`, 'success');
+      }
+      
+      if (notebookNode) {
+        addDeploymentLog(DEPLOYMENT_PHASES.READY, `📓 Notebook: https://rhods-dashboard/notebook/${helmGlobalValues.namespace}/whisper-workbench`, 'success');
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      setIsExecuting(false);
+      
+      // Save deployment status for later viewing
+      setDeploymentStatus(prev => {
+        if (prev) {
+          console.log('Saving deployment status:', prev);
+          setSavedDeploymentStatus(prev);
+        } else {
+          console.log('No deployment status to save');
+        }
+        return prev;
+      });
+      
+      // Add small delay to ensure state is saved
+      setTimeout(() => {
+        console.log('savedDeploymentStatus after save:', savedDeploymentStatus);
+      }, 100);
+      
+      addAlert('Deployment completed successfully! Click "View Logs" to review.', AlertVariant.success);
+      startOngoingFlow();
+      return;
+    }
+
+    // Original execution for non-Helm workflows
     addAlert('Workflow execution started!', AlertVariant.info);
 
     const totalNodes = nodes.length;
@@ -1247,7 +1506,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     // Start ongoing flow animation
     startOngoingFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes.length, isExecuting, executionOrder, connections, addAlert]);
+  }, [nodes.length, isExecuting, executionOrder, connections, addAlert, helmGlobalValues.namespace, addDeploymentLog, updateNodeStatus]);
 
   // Ref to track if ongoing animation should continue
   const ongoingFlowRef = React.useRef<boolean>(false);
@@ -1603,6 +1862,49 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           Save
                         </Button>
                       </ToolbarItem>
+                      <ToolbarItem>
+                        <HelmGlobalValuesPopover
+                          values={helmGlobalValues}
+                          onChange={setHelmGlobalValues}
+                        >
+                          <Button
+                            variant="secondary"
+                            icon={<CogIcon />}
+                            title="Configure global Helm values"
+                            isDisabled={!helmMode}
+                            style={{ display: helmMode ? 'inline-flex' : 'none' }}
+                          >
+                            Global Values
+                          </Button>
+                        </HelmGlobalValuesPopover>
+                      </ToolbarItem>
+                      <ToolbarItem>
+                        <Button
+                          variant="secondary"
+                          icon={<PackageIcon />}
+                          onClick={() => setShowHelmExportModal(true)}
+                          title="Export Helm chart"
+                          isDisabled={!helmMode}
+                          style={{ display: helmMode ? 'inline-flex' : 'none' }}
+                        >
+                          Export Helm Chart
+                        </Button>
+                      </ToolbarItem>
+                      {savedDeploymentStatus && helmMode && (
+                        <ToolbarItem>
+                          <Button
+                            variant="secondary"
+                            icon={<CommentsIcon />}
+                            onClick={() => {
+                              console.log('Opening saved deployment logs');
+                              setDeploymentStatus(savedDeploymentStatus);
+                            }}
+                            title="View deployment logs"
+                          >
+                            View Logs
+                          </Button>
+                        </ToolbarItem>
+                      )}
                       <ToolbarItem>
                         <Button
                           variant="secondary"
@@ -2519,13 +2821,17 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                   </div>
 
                   {/* Execution Progress Dialog - Fixed to top-right corner, outside transformed content */}
-                  {isExecuting && (
+                  {(isExecuting || deploymentStatus) && (
                     <ExecutionOverlay
                       progress={executionProgress}
                       executingCount={executingNodes.size}
                       completedCount={completedNodes.size}
                       totalNodes={nodes.length}
                       statusMessage={executionStatus}
+                      deploymentStatus={deploymentStatus}
+                      onClose={() => {
+                        setDeploymentStatus(null);
+                      }}
                     />
                   )}
 
@@ -2613,6 +2919,34 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         onSelectTemplate={handleSelectTemplate}
       />
 
+      {/* Helm Export Modal */}
+      {helmMode && (
+        <HelmExportModal
+          isOpen={showHelmExportModal}
+          onClose={() => setShowHelmExportModal(false)}
+          nodes={nodes}
+          connections={connections}
+          globals={helmGlobalValues}
+          onExport={async () => {
+            try {
+              await downloadHelmChart(nodes, connections, helmGlobalValues);
+              setShowHelmExportModal(false);
+              addAlert({
+                title: `Helm chart ${globals.chartName}-${globals.chartVersion}.tgz exported successfully`,
+                variant: AlertVariant.success,
+              });
+            } catch (error) {
+              addAlert({
+                title: 'Failed to export Helm chart',
+                variant: AlertVariant.danger,
+              });
+              console.error('Export error:', error);
+            }
+          }}
+        />
+      )}
+
     </Flex>
   );
 };
+// Force rebuild
