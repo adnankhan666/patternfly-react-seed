@@ -8,6 +8,7 @@ import {
   Button,
   Modal,
   ModalVariant,
+  ModalBody,
   Form,
   FormGroup,
   TextInput,
@@ -68,31 +69,33 @@ const Canvas: React.FunctionComponent = () => {
         isOpen={isModalOpen}
         onClose={handleModalToggle}
       >
-        <Form>
-          <FormGroup label="Enter your Data Science project name" isRequired fieldId="project-name">
-            <TextInput
-              isRequired
-              type="text"
-              id="project-name"
-              name="project-name"
-              value={projectName}
-              onChange={(_event, value) => setProjectName(value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCreateProject();
-                }
-              }}
-            />
-          </FormGroup>
-          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-            <Button variant="primary" onClick={handleCreateProject}>
-              Let's Start
-            </Button>
-            <Button variant="link" onClick={handleModalToggle}>
-              Cancel
-            </Button>
-          </div>
-        </Form>
+        <ModalBody>
+          <Form>
+            <FormGroup label="Enter your Data Science project name" isRequired fieldId="project-name">
+              <TextInput
+                isRequired
+                type="text"
+                id="project-name"
+                name="project-name"
+                value={projectName}
+                onChange={(_event, value) => setProjectName(value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCreateProject();
+                  }
+                }}
+              />
+            </FormGroup>
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+              <Button variant="primary" onClick={handleCreateProject}>
+                Let's Start
+              </Button>
+              <Button variant="link" onClick={handleModalToggle}>
+                Cancel
+              </Button>
+            </div>
+          </Form>
+        </ModalBody>
       </Modal>
     </>
   );

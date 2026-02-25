@@ -2855,7 +2855,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       </FlexItem>
 
       {/* Toast Notifications */}
-      <AlertGroup isToast isLiveRegion style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 9999, maxWidth: '400px', opacity: 0.75 }}>
+      <AlertGroup isToast isLiveRegion style={{ position: 'fixed', top: '145px', right: '20px', zIndex: 9999, maxWidth: '400px', opacity: 0.75 }}>
         {alerts.map((alert) => (
           <Alert
             key={alert.id}

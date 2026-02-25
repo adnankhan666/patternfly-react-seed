@@ -44,49 +44,29 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
     }
   }, [deploymentStatus?.logs]);
 
-  // Draggable state
-  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  // Draggable state — position is absolute (left/top from viewport origin via transform)
+  const [position, setPosition] = React.useState(() => ({
+    x: typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 480) : 720,
+    y: 200,
+  }));
   const [isDragging, setIsDragging] = React.useState(false);
-  const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
+  const dragOffset = React.useRef({ x: 0, y: 0 });
   const overlayRef = React.useRef<HTMLDivElement>(null);
 
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+    // Only drag from the title bar area (first child), not the log body
+    dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
     e.preventDefault();
   }, [position]);
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (isDragging && overlayRef.current) {
-      const overlayRect = overlayRef.current.getBoundingClientRect();
-
-      // Calculate new position
-      let newX = e.clientX - dragStart.x;
-      let newY = e.clientY - dragStart.y;
-
-      // Define boundaries
-      // Top boundary: below the header/toolbar and tabs area (approximately 250px from top)
-      const minY = 250;
-      // Left boundary: after the node panel (280px width) plus padding
-      const minX = 300;
-      // Right boundary: keep within viewport minus overlay width and some padding
-      const maxX = window.innerWidth - overlayRect.width - 20;
-      // Bottom boundary: keep within viewport minus overlay height and some padding
-      const maxY = window.innerHeight - overlayRect.height - 20;
-
-      // Constrain position within boundaries
-      newX = Math.max(minX, Math.min(newX, maxX));
-      newY = Math.max(minY, Math.min(newY, maxY));
-
-      setPosition({
-        x: newX,
-        y: newY,
-      });
-    }
-  }, [isDragging, dragStart]);
+    if (!isDragging || !overlayRef.current) return;
+    const overlayRect = overlayRef.current.getBoundingClientRect();
+    const newX = Math.max(0, Math.min(e.clientX - dragOffset.current.x, window.innerWidth - overlayRect.width - 10));
+    const newY = Math.max(0, Math.min(e.clientY - dragOffset.current.y, window.innerHeight - overlayRect.height - 10));
+    setPosition({ x: newX, y: newY });
+  }, [isDragging]);
 
   const handleMouseUp = React.useCallback(() => {
     setIsDragging(false);
@@ -107,7 +87,7 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
   // Render Helm deployment view
   if (deploymentStatus) {
     const phaseInfo = PHASE_DESCRIPTIONS[deploymentStatus.phase];
-    const phasePercent = ((deploymentStatus.phase - 1) / deploymentStatus.totalPhases) * 100;
+    const phasePercent = (deploymentStatus.phase / deploymentStatus.totalPhases) * 100;
 
     return (
       <div
@@ -120,7 +100,7 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
           cursor: isDragging ? 'grabbing' : 'move',
-          width: '900px',
+          width: '450px',
           height: 'calc(100vh - 300px)',
           maxHeight: 'calc(100vh - 300px)',
           overflow: 'hidden',
@@ -166,15 +146,16 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
             role="log" 
             aria-live="polite" 
             aria-atomic="false"
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               flex: '1 1 auto',
-              overflowY: 'scroll',
+              overflowY: 'auto',
               overflowX: 'hidden',
               minHeight: 0,
               maxHeight: '100%',
             }}
           >
-            {deploymentStatus.logs.slice(-10).map((log) => (
+            {deploymentStatus.logs.map((log) => (
               <div
                 key={log.id}
                 className={`deployment-log-entry log-${log.type}`}

@@ -512,13 +512,7 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Helm Deployment Overlay Styles */
-.execution-overlay.helm-deployment {
-  width: 600px !important;
-  min-height: 800px;
-  max-height: 1400px;
-  height: auto;
-}
+/* Helm Deployment Overlay Styles - dimensions handled in LoadingSpinner.css */
 
 .deployment-phase {
   font-size: 14px;
