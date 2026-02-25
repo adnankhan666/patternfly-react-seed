@@ -12,7 +12,7 @@
     "start": "sirv dist --cors --single --host --port 8080",
     "start:dev": "webpack serve --color --progress --config webpack.dev.js",
     "server": "node server/server.js",
-    "server:dev": "nodemon server/server.js",
+    "server:dev": "nodemon --delay 2 server/server.js",
     "dev": "concurrently \"npm run server:dev\" \"npm run start:dev\"",
     "test": "jest",
     "test:watch": "jest --watch",

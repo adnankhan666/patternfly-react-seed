@@ -14,3 +14,4 @@ export { TemplateSelector } from './TemplateSelector';
 export { HelmConfigForm } from './HelmConfigForm';
 export { HelmGlobalValuesPopover } from './HelmGlobalValuesPopover';
 export { HelmExportModal } from './HelmExportModal';
+export { RepoAnalyzer } from './RepoAnalyzer';

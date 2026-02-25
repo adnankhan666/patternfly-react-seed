@@ -3,6 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { authMiddleware } = require('./middleware/auth');
 const workflowRoutes = require('./workflowRoutes');
 const authRoutes = require('./authRoutes');
+const repoAnalyzeRoute = require('./repoAnalyzeRoute');
 const projectRoutes = require('./projectRoutes');
 const executionRoutes = require('./executionRoutes');
 const modelRoutes = require('./modelRoutes');
@@ -23,6 +24,9 @@ const router = express.Router();
 
 // Authentication routes (public)
 router.use('/auth', authRoutes);
+
+// Repo analysis — no auth required (public repos need no token; private repos supply one per-request)
+router.use('/repo-analyze', repoAnalyzeRoute);
 
 // Protected routes - require authentication
 router.use('/workflows', authMiddleware, workflowRoutes);

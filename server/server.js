@@ -33,18 +33,20 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rate limiting
+// Rate limiting — more generous in development
+const isDev = process.env.NODE_ENV !== 'production';
+
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 1000 : 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const chatLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // Limit each IP to 10 chat requests per minute
+  windowMs: 60 * 1000,
+  max: isDev ? 60 : 10,
   message: 'Too many chat requests, please slow down.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -53,8 +55,9 @@ const chatLimiter = rateLimit({
 // Apply general rate limiter to all API routes
 app.use('/api', generalLimiter);
 
-// Apply stricter rate limiting to chat endpoint
+// Apply stricter rate limiting to chat and repo-analyze endpoints
 app.use('/api/chat', chatLimiter);
+app.use('/api/repo-analyze', chatLimiter);
 
 // API routes
 app.use('/api', apiRouter);

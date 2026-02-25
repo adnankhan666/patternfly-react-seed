@@ -17,6 +17,7 @@ import {
 } from '@patternfly/react-core';
 import { CubesIcon } from '@patternfly/react-icons';
 import { WORKFLOW_TEMPLATES, WorkflowTemplate, getTemplatesByCategory } from '../../../data/workflowTemplates';
+import { RepoAnalyzer } from './RepoAnalyzer';
 
 interface TemplateSelectorProps {
   isOpen: boolean;
@@ -62,10 +63,13 @@ export const TemplateSelector: React.FunctionComponent<TemplateSelectorProps> = 
         <Tab eventKey="deployment" title={<TabTitleText>Deployment</TabTitleText>} />
         <Tab eventKey="monitoring" title={<TabTitleText>Monitoring</TabTitleText>} />
         <Tab eventKey="helm-quickstart" title={<TabTitleText>Helm Quickstart</TabTitleText>} />
+        <Tab eventKey="from-github" title={<TabTitleText>From GitHub</TabTitleText>} />
       </Tabs>
 
       <div style={{ marginTop: '24px', maxHeight: '500px', overflowY: 'auto' }}>
-        {filteredTemplates.length > 0 ? (
+        {activeTab === 'from-github' ? (
+          <RepoAnalyzer onTemplateReady={(template) => { handleSelectTemplate(template); }} />
+        ) : filteredTemplates.length > 0 ? (
           <Gallery hasGutter minWidths={{ default: '300px' }}>
             {filteredTemplates.map((template) => (
               <GalleryItem key={template.id}>

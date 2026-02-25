@@ -20,6 +20,14 @@ const Canvas: React.FunctionComponent = () => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [projectName, setProjectName] = React.useState('');
   const navigate = useNavigate();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (isModalOpen) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isModalOpen]);
 
   const handleModalToggle = () => {
     setIsModalOpen(!isModalOpen);
@@ -74,6 +82,7 @@ const Canvas: React.FunctionComponent = () => {
             <FormGroup label="Enter your Data Science project name" isRequired fieldId="project-name">
               <TextInput
                 isRequired
+                ref={inputRef}
                 type="text"
                 id="project-name"
                 name="project-name"
