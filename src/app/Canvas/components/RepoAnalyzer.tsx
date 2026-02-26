@@ -313,7 +313,6 @@ export const RepoAnalyzer: React.FunctionComponent<RepoAnalyzerProps> = ({ onTem
               <FormGroup
                 label="Personal Access Token"
                 fieldId="github-token"
-                helperText="Requires repo:read scope. Not stored — used only for this request."
               >
                 <TextInput
                   type="password"

@@ -55,6 +55,9 @@ import {
   MapIcon,
   CogIcon,
   PackageIcon,
+  ConnectedIcon,
+  DisconnectedIcon,
+  CloudUploadAltIcon,
 } from '@patternfly/react-icons';
 import { Alert, AlertGroup, AlertActionCloseButton, AlertVariant } from '@patternfly/react-core';
 import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition, HelmGlobalValues } from './types';
@@ -81,7 +84,8 @@ import {
   GRID_SIZE,
   GRID_ENABLED_DEFAULT,
 } from './constants';
-import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm, HelmGlobalValuesPopover, HelmExportModal } from './components';
+import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm, HelmGlobalValuesPopover, HelmExportModal, ClusterConnect } from './components';
+import { parseClusterName } from './components/ClusterConnect';
 import { saveWorkflowState, loadWorkflowState } from '../../services/workflowService';
 import { WorkflowTemplate } from '../../data/workflowTemplates';
 import { generateHelmNodeYaml } from './utils/helmYamlGenerator';
@@ -114,6 +118,7 @@ interface WorkflowState {
   nodes: NodeData[];
   connections: Connection[];
 }
+
 
 export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ projectName }) => {
   const navigate = useNavigate();
@@ -193,6 +198,12 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const [drawerActiveTab, setDrawerActiveTab] = React.useState<string | number>(0);
   const [showHelmExportModal, setShowHelmExportModal] = React.useState(false);
   const [savedDeploymentStatus, setSavedDeploymentStatus] = React.useState<DeploymentStatus | null>(null);
+
+  // Cluster connect state
+  const [kubeconfig, setKubeconfig] = React.useState<string | null>(null);
+  const [clusterName, setClusterName] = React.useState<string | null>(null);
+  const [isClusterConnectOpen, setIsClusterConnectOpen] = React.useState(false);
+  const [isDeploying, setIsDeploying] = React.useState(false);
 
   // Zoom control handlers (memoized with useCallback)
   const handleZoomIn = React.useCallback(() => {
@@ -1508,6 +1519,92 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length, isExecuting, executionOrder, connections, addAlert, helmGlobalValues.namespace, addDeploymentLog, updateNodeStatus]);
 
+  // Deploy to real cluster via SSE
+  const handleDeployToCluster = React.useCallback(async () => {
+    if (!kubeconfig) {
+      addAlert('Connect a cluster first', AlertVariant.warning);
+      return;
+    }
+    const helmNodes = nodes.filter((n) => n.data?.helmConfig);
+    if (helmNodes.length === 0) {
+      addAlert('No Helm nodes found in this workflow', AlertVariant.warning);
+      return;
+    }
+
+    // Build manifests array from existing YAML generator
+    const manifests = helmNodes
+      .map((n) => {
+        const resourceType = n.data?.helmConfig?.resourceType;
+        const values = n.data?.helmConfig?.values || {};
+        if (!resourceType) return null;
+        const yaml = generateHelmNodeYaml(resourceType, values, helmGlobalValues);
+        return { nodeId: n.id, nodeName: n.label, resourceType, yaml };
+      })
+      .filter(Boolean);
+
+    // Reset overlay to fresh state
+    const initialStatus: DeploymentStatus = {
+      phase: 1,
+      totalPhases: 6,
+      currentPhaseProgress: 0,
+      logs: [],
+      nodeStatuses: new Map(),
+    };
+    setDeploymentStatus(initialStatus);
+    setIsDeploying(true);
+    addAlert('Starting cluster deployment...', AlertVariant.info);
+
+    const API_BASE = process.env.API_URL || 'http://localhost:3001';
+
+    try {
+      const response = await fetch(`${API_BASE}/api/cluster-deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kubeconfig, manifests, globals: helmGlobalValues }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'phase') {
+              setDeploymentStatus((prev) => prev ? { ...prev, phase: event.phase } : prev);
+            } else if (event.type === 'log') {
+              addDeploymentLog(event.phase, event.message, event.logType || 'info', undefined, event.nodeName);
+            } else if (event.type === 'done') {
+              setIsDeploying(false);
+              addAlert('Cluster deployment complete!', AlertVariant.success);
+            } else if (event.type === 'error') {
+              addDeploymentLog(event.phase || 1, event.message, 'error');
+              setIsDeploying(false);
+              addAlert(`Deployment error: ${event.message}`, AlertVariant.danger);
+            }
+          } catch {
+            // malformed event — skip
+          }
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addAlert(`Deployment failed: ${msg}`, AlertVariant.danger);
+      setIsDeploying(false);
+    }
+  }, [kubeconfig, nodes, helmGlobalValues, addAlert, addDeploymentLog, generateHelmNodeYaml]);
+
   // Ref to track if ongoing animation should continue
   const ongoingFlowRef = React.useRef<boolean>(false);
   const animationFrameRef = React.useRef<number>(0);
@@ -1932,7 +2029,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           variant="primary"
                           icon={<PlayIcon />}
                           onClick={handleExecute}
-                          isDisabled={isExecuting || isImporting || isExporting || isLoading}
+                          isDisabled={isExecuting || isImporting || isExporting || isLoading || isDeploying}
                         >
                           Execute
                         </Button>
@@ -1991,6 +2088,70 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           </CardBody>
         </Card>
       </FlexItem>
+
+      {/* Row 2 — Cluster Deployment (shown whenever Helm nodes are present) */}
+      {nodes.some((n) => n.data?.helmConfig) && (
+        <FlexItem>
+          <Card isCompact>
+            <CardBody style={{ padding: '8px 16px' }}>
+              <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
+                <FlexItem>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Cluster Deploy
+                  </span>
+                </FlexItem>
+                <FlexItem>
+                  <Button
+                    variant={kubeconfig ? 'secondary' : 'secondary'}
+                    icon={kubeconfig ? <ConnectedIcon /> : <DisconnectedIcon />}
+                    onClick={() => setIsClusterConnectOpen(true)}
+                    style={kubeconfig ? { borderColor: '#16a34a', color: '#16a34a' } : {}}
+                  >
+                    {kubeconfig ? clusterName : 'Connect Cluster'}
+                  </Button>
+                </FlexItem>
+                {kubeconfig && (
+                  <>
+                    <FlexItem>
+                      <Button
+                        variant="primary"
+                        icon={<CloudUploadAltIcon />}
+                        onClick={handleDeployToCluster}
+                        isDisabled={isDeploying || isExecuting}
+                        isLoading={isDeploying}
+                        style={{ background: '#7c3aed', borderColor: '#7c3aed' }}
+                      >
+                        {isDeploying ? 'Deploying...' : 'Deploy to Cluster'}
+                      </Button>
+                    </FlexItem>
+                    <FlexItem>
+                      <Button
+                        variant="link"
+                        icon={<DisconnectedIcon />}
+                        onClick={() => {
+                          setKubeconfig(null);
+                          setClusterName(null);
+                          addAlert('Disconnected from cluster', AlertVariant.info);
+                        }}
+                        style={{ color: '#dc2626' }}
+                      >
+                        Disconnect
+                      </Button>
+                    </FlexItem>
+                  </>
+                )}
+                {!kubeconfig && (
+                  <FlexItem>
+                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                      Connect a cluster to enable real Kubernetes deployment
+                    </span>
+                  </FlexItem>
+                )}
+              </Flex>
+            </CardBody>
+          </Card>
+        </FlexItem>
+      )}
 
       {/* Workflow Tabs */}
       <FlexItem>
@@ -2945,6 +3106,23 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           }}
         />
       )}
+
+      <ClusterConnect
+        isOpen={isClusterConnectOpen}
+        onClose={() => setIsClusterConnectOpen(false)}
+        onConnect={(kc) => {
+          setKubeconfig(kc);
+          setClusterName(parseClusterName(kc));
+          addAlert(`Connected to cluster: ${parseClusterName(kc)}`, AlertVariant.success);
+        }}
+        onDisconnect={() => {
+          setKubeconfig(null);
+          setClusterName(null);
+          addAlert('Disconnected from cluster', AlertVariant.info);
+        }}
+        isConnected={!!kubeconfig}
+        clusterName={clusterName}
+      />
 
     </Flex>
   );

@@ -9,6 +9,7 @@ storybook-static
 .DS_Store
 .idea
 .env
+.env.local
 .history
 cypress/videos
 cypress/screenshots

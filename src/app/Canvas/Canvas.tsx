@@ -23,10 +23,9 @@ const Canvas: React.FunctionComponent = () => {
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
-    if (isModalOpen) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 50);
-      return () => clearTimeout(timer);
-    }
+    if (!isModalOpen) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
   }, [isModalOpen]);
 
   const handleModalToggle = () => {

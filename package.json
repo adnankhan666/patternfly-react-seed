@@ -80,6 +80,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@kubernetes/client-node": "^1.4.0",
     "@patternfly/react-charts": "^8.4.0",
     "@patternfly/react-core": "^6.0.0",
     "@patternfly/react-icons": "^6.0.0",

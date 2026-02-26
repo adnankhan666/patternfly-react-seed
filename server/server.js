@@ -55,9 +55,10 @@ const chatLimiter = rateLimit({
 // Apply general rate limiter to all API routes
 app.use('/api', generalLimiter);
 
-// Apply stricter rate limiting to chat and repo-analyze endpoints
+// Apply stricter rate limiting to AI/deploy endpoints
 app.use('/api/chat', chatLimiter);
 app.use('/api/repo-analyze', chatLimiter);
+app.use('/api/cluster-deploy', chatLimiter);
 
 // API routes
 app.use('/api', apiRouter);
