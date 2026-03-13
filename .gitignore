@@ -14,3 +14,14 @@ storybook-static
 cypress/videos
 cypress/screenshots
 cypress/downloads
+
+# Internal docs (local only)
+CRITICAL_ANALYSIS.md
+IMPROVEMENTS.md
+Makefile
+noveltycheck1.md
+PATENT_ANALYSIS.md
+RECOMMENDATIONS.md
+IMPLEMENTATION_SUMMARY.md
+DEPLOYMENT_CHECKLIST.md
+CHATBOT-FIX.md
