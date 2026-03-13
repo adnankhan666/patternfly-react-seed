@@ -488,6 +488,100 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       { id: 'conn-5', source: 'node-notebook', target: 'node-clone-job', sourceConnector: 'bottom', targetConnector: 'top' },
     ],
   },
+  {
+    id: 'lightweight-ds-workbench',
+    name: 'Lightweight Data Science Workbench',
+    description: 'CPU-only Jupyter workbench with persistent storage and git clone — fits clusters without GPU nodes',
+    category: 'helm-quickstart',
+    icon: '📓',
+    nodes: [
+      {
+        id: 'node-pvc',
+        type: 'pvc',
+        label: 'Workbench PVC',
+        position: { x: 100, y: 100 },
+        data: {
+          color: '#06b6d4',
+          description: '5Gi persistent storage',
+          helmConfig: {
+            resourceType: 'pvc',
+            values: {
+              name: 'ds-workbench-storage',
+              size: '5Gi',
+              storageClassName: 'gp3-csi',
+              accessMode: 'ReadWriteOnce',
+            },
+          },
+        },
+      },
+      {
+        id: 'node-rbac',
+        type: 'rbac',
+        label: 'RBAC',
+        position: { x: 400, y: 100 },
+        data: {
+          color: '#f97316',
+          description: 'ServiceAccount + Role',
+          helmConfig: {
+            resourceType: 'rbac',
+            values: {
+              serviceAccountName: 'ds-workbench',
+              roleName: 'ds-workbench-pod-exec',
+              roleBindingName: 'ds-workbench-exec',
+            },
+          },
+        },
+      },
+      {
+        id: 'node-notebook',
+        type: 'notebook',
+        label: 'DS Notebook',
+        position: { x: 250, y: 300 },
+        data: {
+          color: '#ec4899',
+          description: 'Jupyter workbench (CPU)',
+          helmConfig: {
+            resourceType: 'notebook',
+            values: {
+              name: 'ds-workbench',
+              image: 'image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/s2i-generic-data-science-notebook:2025.1',
+              cpuRequest: '1',
+              memoryRequest: '4Gi',
+              cpuLimit: '2',
+              memoryLimit: '8Gi',
+              pvcName: 'ds-workbench-storage',
+              serviceAccountName: 'ds-workbench',
+            },
+          },
+        },
+      },
+      {
+        id: 'node-clone-job',
+        type: 'job',
+        label: 'Git Clone Job',
+        position: { x: 250, y: 500 },
+        data: {
+          color: '#22c55e',
+          description: 'Clone starter notebooks',
+          helmConfig: {
+            resourceType: 'job',
+            values: {
+              name: 'ds-workbench-clone-repo',
+              gitRepoUrl: 'https://github.com/opendatahub-io/notebooks.git',
+              notebookName: 'ds-workbench',
+              serviceAccountName: 'ds-workbench',
+              backoffLimit: 3,
+            },
+          },
+        },
+      },
+    ],
+    connections: [
+      { id: 'conn-1', source: 'node-pvc', target: 'node-notebook', sourceConnector: 'bottom', targetConnector: 'top' },
+      { id: 'conn-2', source: 'node-rbac', target: 'node-notebook', sourceConnector: 'bottom', targetConnector: 'top' },
+      { id: 'conn-3', source: 'node-notebook', target: 'node-clone-job', sourceConnector: 'bottom', targetConnector: 'top' },
+    ],
+  },
 ];
 
 /**

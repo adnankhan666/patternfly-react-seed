@@ -550,11 +550,14 @@
   background: #1e1e1e;
   border-radius: 6px;
   padding: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 12px;
   line-height: 1.8;
   min-height: 0;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text;
 }
 
 .deployment-log-entry {
@@ -562,6 +565,8 @@
   gap: 8px;
   margin-bottom: 4px;
   align-items: baseline;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .log-time {
@@ -781,6 +786,36 @@
   border-width: 2px;
 }
 
+/* Failed / disconnected node state */
+.workflow-node.failed {
+  border-color: #ef4444 !important;
+  border-width: 2px;
+  border-style: dashed !important;
+  opacity: 0.75;
+  animation: none !important;
+}
+
+.workflow-node.failed::before,
+.workflow-node.failed::after {
+  display: none !important;
+}
+
+.workflow-node.failed .node-header {
+  position: relative;
+}
+
+.workflow-node.failed .node-header::after {
+  content: '✕';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+}
+
 /* Node body needs position relative for pseudo-element */
 .node-body {
   position: relative;
@@ -811,4 +846,9 @@
 
 .pf-v6-theme-dark .workflow-node.validating::before {
   border-color: rgba(251, 191, 36, 0.7);
+}
+
+.pf-v6-theme-dark .workflow-node.failed {
+  border-color: #f87171 !important;
+  opacity: 0.7;
 }

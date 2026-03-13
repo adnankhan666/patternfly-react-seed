@@ -159,6 +159,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const [isExecuting, setIsExecuting] = React.useState(false);
   const [executingNodes, setExecutingNodes] = React.useState<Set<string>>(new Set());
   const [completedNodes, setCompletedNodes] = React.useState<Set<string>>(new Set());
+  const [failedNodes, setFailedNodes] = React.useState<Set<string>>(new Set());
   const [activeConnections, setActiveConnections] = React.useState<Set<string>>(new Set());
   const [particles, setParticles] = React.useState<Array<{
     id: string;
@@ -1542,7 +1543,15 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       })
       .filter(Boolean);
 
-    // Reset overlay to fresh state
+    // Build nodeName → nodeId lookup
+    const nameToId = new Map<string, string>();
+    helmNodes.forEach((n) => nameToId.set(n.label, n.id));
+
+    // Reset all visual state
+    setExecutingNodes(new Set());
+    setCompletedNodes(new Set());
+    setFailedNodes(new Set());
+
     const initialStatus: DeploymentStatus = {
       phase: 1,
       totalPhases: 6,
@@ -1552,9 +1561,14 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     };
     setDeploymentStatus(initialStatus);
     setIsDeploying(true);
+    setIsExecuting(true);
     addAlert('Starting cluster deployment...', AlertVariant.info);
 
+    // Mark all helm nodes as executing initially
+    setExecutingNodes(new Set(helmNodes.map((n) => n.id)));
+
     const API_BASE = process.env.API_URL || 'http://localhost:3001';
+    let hasError = false;
 
     try {
       const response = await fetch(`${API_BASE}/api/cluster-deploy`, {
@@ -1585,12 +1599,37 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
               setDeploymentStatus((prev) => prev ? { ...prev, phase: event.phase } : prev);
             } else if (event.type === 'log') {
               addDeploymentLog(event.phase, event.message, event.logType || 'info', undefined, event.nodeName);
+
+              // Track node visual state from SSE log events
+              const nodeId = event.nodeName ? nameToId.get(event.nodeName) : undefined;
+              if (nodeId) {
+                if (event.logType === 'error') {
+                  setFailedNodes((prev) => new Set([...prev, nodeId]));
+                  setExecutingNodes((prev) => { const s = new Set(prev); s.delete(nodeId); return s; });
+                } else if (event.logType === 'success' && /created|patched|ready|completed/i.test(event.message)) {
+                  setCompletedNodes((prev) => new Set([...prev, nodeId]));
+                  setExecutingNodes((prev) => { const s = new Set(prev); s.delete(nodeId); return s; });
+                }
+              }
             } else if (event.type === 'done') {
+              // Move any remaining executing nodes to completed
+              setExecutingNodes((prev) => {
+                setCompletedNodes((c) => new Set([...c, ...prev]));
+                return new Set();
+              });
               setIsDeploying(false);
+              setIsExecuting(false);
               addAlert('Cluster deployment complete!', AlertVariant.success);
             } else if (event.type === 'error') {
+              hasError = true;
               addDeploymentLog(event.phase || 1, event.message, 'error');
+              // Mark all still-executing nodes as failed
+              setExecutingNodes((prev) => {
+                setFailedNodes((f) => new Set([...f, ...prev]));
+                return new Set();
+              });
               setIsDeploying(false);
+              setIsExecuting(false);
               addAlert(`Deployment error: ${event.message}`, AlertVariant.danger);
             }
           } catch {
@@ -1599,17 +1638,32 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         }
       }
     } catch (err: unknown) {
+      hasError = true;
       const msg = err instanceof Error ? err.message : String(err);
       addAlert(`Deployment failed: ${msg}`, AlertVariant.danger);
+      // Mark all still-executing nodes as failed
+      setExecutingNodes((prev) => {
+        setFailedNodes((f) => new Set([...f, ...prev]));
+        return new Set();
+      });
       setIsDeploying(false);
+      setIsExecuting(false);
     }
-  }, [kubeconfig, nodes, helmGlobalValues, addAlert, addDeploymentLog, generateHelmNodeYaml]);
+
+    // Only start flow animation if there were no errors
+    if (!hasError) {
+      startOngoingFlow();
+    }
+  }, [kubeconfig, nodes, helmGlobalValues, addAlert, addDeploymentLog, generateHelmNodeYaml, startOngoingFlow]);
 
   // Ref to track if ongoing animation should continue
   const ongoingFlowRef = React.useRef<boolean>(false);
   const animationFrameRef = React.useRef<number>(0);
 
   // Start ongoing flow animation between connected nodes
+  const failedNodesRef = React.useRef<Set<string>>(failedNodes);
+  React.useEffect(() => { failedNodesRef.current = failedNodes; }, [failedNodes]);
+
   const startOngoingFlow = React.useCallback(() => {
     if (connections.length === 0) {
       return;
@@ -1624,8 +1678,12 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         return;
       }
 
-      const newParticles = connections.flatMap((conn, idx) => {
-        // Create bidirectional particles with faster movement
+      // Only animate connections between healthy (non-failed) nodes
+      const healthy = connections.filter(
+        (conn) => !failedNodesRef.current.has(conn.source) && !failedNodesRef.current.has(conn.target)
+      );
+
+      const newParticles = healthy.flatMap((conn, idx) => {
         const forwardProgress = ((animationFrameRef.current * 2 + idx * 40) % 200) / 200;
         const backwardProgress = ((animationFrameRef.current * 2 + idx * 40 + 100) % 200) / 200;
 
@@ -1648,13 +1706,11 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       setFlowParticles(newParticles);
       animationFrameRef.current++;
 
-      // Schedule next frame
       if (ongoingFlowRef.current) {
-        setTimeout(animate, 20); // 50 FPS for smoother animation
+        setTimeout(animate, 20);
       }
     };
 
-    // Start animation
     animate();
   }, [connections]);
 
@@ -2876,12 +2932,13 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
                   {/* Render nodes */}
                   {nodes.map((node) => {
-                    const isExecuting = executingNodes.has(node.id);
+                    const isNodeExecuting = executingNodes.has(node.id);
                     const isCompleted = completedNodes.has(node.id);
+                    const isFailed = failedNodes.has(node.id);
                     return (
                     <div
                       key={node.id}
-                      className={`workflow-node ${selectedNode === node.id ? 'selected' : ''} ${isExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''}`}
+                      className={`workflow-node ${selectedNode === node.id ? 'selected' : ''} ${isNodeExecuting ? 'executing' : ''} ${isCompleted ? 'completed' : ''} ${isFailed ? 'failed' : ''}`}
                       style={{
                         left: node.position.x,
                         top: node.position.y,

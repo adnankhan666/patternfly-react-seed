@@ -26,26 +26,51 @@ function sendDone(res) {
   send(res, { type: 'done' });
 }
 
+function getErrorStatusCode(e) {
+  if (e.statusCode) return e.statusCode;
+  if (e.response?.statusCode) return e.response.statusCode;
+  if (typeof e.body === 'object' && e.body?.code) return e.body.code;
+  if (typeof e.body === 'string') {
+    try { return JSON.parse(e.body).code; } catch { /* ignore */ }
+  }
+  const match = e.message?.match(/HTTP-Code:\s*(\d+)/);
+  if (match) return parseInt(match[1], 10);
+  return undefined;
+}
+
 /**
- * Apply a single parsed Kubernetes object — create it if missing, patch if present.
+ * Apply a single parsed Kubernetes object — create it if missing, replace if present.
+ * Uses create-or-replace instead of create-or-patch to avoid content-type issues
+ * with @kubernetes/client-node v1.x.
  */
 async function applyObject(client, obj) {
   try {
-    await client.read(obj);
-    // Resource exists — patch it
-    await client.patch(
-      obj,
-      undefined,
-      undefined,
-      undefined,
-      true,
-      { headers: { 'Content-Type': 'application/strategic-merge-patch+json' } }
-    );
-    return 'patched';
+    await client.create(obj);
+    return 'created';
   } catch (e) {
-    if (e.response && e.response.statusCode === 404) {
+    const code = getErrorStatusCode(e);
+    if (code === 409) {
+      // Resource already exists
+      try {
+        const resp = await client.read(obj);
+        const existing = resp?.body || resp;
+        const rv = existing?.metadata?.resourceVersion;
+        if (rv) {
+          obj.metadata = obj.metadata || {};
+          obj.metadata.resourceVersion = rv;
+          await client.replace(obj);
+          return 'updated';
+        }
+      } catch {
+        // replace failed (e.g. immutable resource like Job) — fall through to delete+recreate
+      }
+      // Clean resourceVersion before recreating (may have been set above)
+      if (obj.metadata) delete obj.metadata.resourceVersion;
+      try { await client.delete(obj); } catch { /* ignore */ }
+      // Wait for deletion to finalize
+      await new Promise(r => setTimeout(r, 2000));
       await client.create(obj);
-      return 'created';
+      return 'replaced';
     }
     throw e;
   }
@@ -73,8 +98,8 @@ async function pollReady(client, obj, timeoutMs = 120000) {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
     try {
-      const response = await client.read(obj);
-      const resource = response.body;
+      const resp = await client.read(obj);
+      const resource = resp?.body || resp;
       const conditions = resource?.status?.conditions || [];
       const readyCondition = conditions.find(
         (c) => c.type === 'Ready' || c.type === 'Available'
@@ -143,14 +168,32 @@ router.post('/', async (req, res) => {
       await coreClient.readNamespace({ name: namespace });
       sendLog(res, 1, `Namespace "${namespace}" exists`, 'success');
     } catch (e) {
-      if (e.response && e.response.statusCode === 404) {
+      if (getErrorStatusCode(e) === 404) {
         sendLog(res, 1, `Namespace "${namespace}" not found — creating it...`, 'warning');
-        await coreClient.createNamespace({
-          body: { metadata: { name: namespace } },
-        });
+        try {
+          await coreClient.createNamespace({
+            body: { apiVersion: 'v1', kind: 'Namespace', metadata: { name: namespace } },
+          });
+        } catch {
+          // On OpenShift, try creating a Project instead
+          const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
+          await customApi.createClusterCustomObject({
+            group: 'project.openshift.io',
+            version: 'v1',
+            plural: 'projectrequests',
+            body: {
+              apiVersion: 'project.openshift.io/v1',
+              kind: 'ProjectRequest',
+              metadata: { name: namespace },
+              displayName: namespace,
+            },
+          });
+        }
         sendLog(res, 1, `Namespace "${namespace}" created`, 'success');
       } else {
-        sendError(res, `Cannot connect to cluster: ${e.message || JSON.stringify(e.body)}`);
+        let msg = e.message || String(e);
+        try { msg = typeof e.body === 'string' ? JSON.parse(e.body).message : e.body?.message || msg; } catch { /* keep msg */ }
+        sendError(res, `Cannot connect to cluster: ${msg}`);
         res.end();
         return;
       }
@@ -170,8 +213,16 @@ router.post('/', async (req, res) => {
         }
         return { ok: true };
       } catch (e) {
-        const msg = e.body?.message || e.message || String(e);
-        sendLog(res, phase, `  Error applying ${m.resourceType}: ${msg}`, 'error', m.nodeName);
+        let msg = e.message || String(e);
+        try { msg = typeof e.body === 'string' ? JSON.parse(e.body).message : e.body?.message || msg; } catch { /* keep msg */ }
+        // Detect missing CRDs (404 for custom resource APIs)
+        if (msg.includes('Failed to fetch resource metadata') || (msg.includes('404') && msg.includes('page not found'))) {
+          const crdMatch = m.yaml.match(/apiVersion:\s*([^\n]+)/);
+          const apiGroup = crdMatch ? crdMatch[1].trim() : 'unknown';
+          sendLog(res, phase, `  CRD not installed: ${apiGroup} — install the required operator first`, 'error', m.nodeName);
+        } else {
+          sendLog(res, phase, `  Error applying ${m.resourceType}: ${msg}`, 'error', m.nodeName);
+        }
         return { ok: false, error: msg };
       }
     };

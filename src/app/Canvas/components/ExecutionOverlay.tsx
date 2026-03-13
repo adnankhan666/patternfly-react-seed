@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
-import { DeploymentStatus, PHASE_DESCRIPTIONS } from '../types/deploymentPhases';
+import { DeploymentStatus, DeploymentLog, PHASE_DESCRIPTIONS } from '../types/deploymentPhases';
 import './LoadingSpinner.css';
 
 /**
@@ -25,6 +25,19 @@ interface ExecutionOverlayProps {
   onClose?: () => void;
 }
 
+function formatLogAsText(log: DeploymentLog): string {
+  const ts = log.timestamp.toLocaleTimeString('en-US', {
+    hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const node = log.nodeName ? ` [${log.nodeName}]` : '';
+  const level = log.type === 'info' ? '' : ` [${log.type.toUpperCase()}]`;
+  return `${ts}${node}${level} ${log.message}`;
+}
+
+function formatAllLogs(logs: DeploymentLog[]): string {
+  return logs.map(formatLogAsText).join('\n');
+}
+
 export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = React.memo(({
   progress,
   executingCount,
@@ -36,6 +49,7 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
 }) => {
   const pendingCount = totalNodes - completedCount - executingCount;
   const logsEndRef = React.useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = React.useState(false);
 
   // Auto-scroll logs to bottom
   React.useEffect(() => {
@@ -45,16 +59,31 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
   }, [deploymentStatus?.logs]);
 
   // Draggable state — position is absolute (left/top from viewport origin via transform)
-  const [position, setPosition] = React.useState(() => ({
-    x: typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 480) : 720,
-    y: 200,
-  }));
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [initialized, setInitialized] = React.useState(false);
+
+  React.useEffect(() => {
+    if (initialized) return;
+    const canvas = document.querySelector('.workflow-canvas');
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      setPosition({
+        x: rect.right - 556,
+        y: rect.top + 8,
+      });
+    } else {
+      setPosition({
+        x: typeof window !== 'undefined' ? window.innerWidth - 556 : 720,
+        y: 80,
+      });
+    }
+    setInitialized(true);
+  }, [initialized]);
   const [isDragging, setIsDragging] = React.useState(false);
   const dragOffset = React.useRef({ x: 0, y: 0 });
   const overlayRef = React.useRef<HTMLDivElement>(null);
 
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
-    // Only drag from the title bar area (first child), not the log body
     dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     setIsDragging(true);
     e.preventDefault();
@@ -84,6 +113,27 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
     return undefined;
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  const handleCopyLogs = React.useCallback(() => {
+    if (!deploymentStatus?.logs.length) return;
+    const text = formatAllLogs(deploymentStatus.logs);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [deploymentStatus?.logs]);
+
+  const handleDownloadLogs = React.useCallback(() => {
+    if (!deploymentStatus?.logs.length) return;
+    const text = formatAllLogs(deploymentStatus.logs);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `deployment-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.log`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [deploymentStatus?.logs]);
+
   // Render Helm deployment view
   if (deploymentStatus) {
     const phaseInfo = PHASE_DESCRIPTIONS[deploymentStatus.phase];
@@ -96,34 +146,39 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
         role="status"
         aria-labelledby="deployment-title"
         aria-live="polite"
-        onMouseDown={handleMouseDown}
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: isDragging ? 'grabbing' : 'move',
-          width: '450px',
-          height: 'calc(100vh - 300px)',
-          maxHeight: 'calc(100vh - 300px)',
+          width: '540px',
+          height: 'calc(100vh - 240px)',
+          maxHeight: 'calc(100vh - 240px)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
         <div className="execution-info" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Title bar — draggable */}
+          <div
+            onMouseDown={handleMouseDown}
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              padding: '0 0 4px 0',
+            }}
+          >
             <div className="execution-title" id="deployment-title">
               {phaseInfo.icon} Helm Deployment
             </div>
-            {onClose && deploymentStatus.phase === 6 && (
+            {onClose && (
               <button
-                onClick={onClose}
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  fontSize: '20px',
-                  padding: '0 4px',
+                  background: 'transparent', border: 'none', color: '#9ca3af',
+                  cursor: 'pointer', fontSize: '18px', padding: '2px 6px',
+                  borderRadius: '4px', lineHeight: 1,
                 }}
+                onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#f3f4f6'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.1)'; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#9ca3af'; (e.target as HTMLElement).style.background = 'transparent'; }}
                 title="Close"
               >
                 ✕
@@ -140,11 +195,48 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
             <div className="phase-progress-bar" style={{ width: `${phasePercent}%` }} />
           </div>
 
-          {/* Deployment Logs */}
-          <div 
-            className="deployment-logs" 
-            role="log" 
-            aria-live="polite" 
+          {/* Log toolbar */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '6px', padding: '0 2px',
+          }}>
+            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500 }}>
+              {deploymentStatus.logs.length} log entries
+            </span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                onClick={handleCopyLogs}
+                disabled={!deploymentStatus.logs.length}
+                style={{
+                  background: 'none', border: '1px solid #374151', borderRadius: '4px',
+                  color: copied ? '#10b981' : '#9ca3af', cursor: 'pointer',
+                  fontSize: '11px', padding: '2px 8px',
+                  transition: 'color 0.2s',
+                }}
+                title="Copy all logs to clipboard"
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+              <button
+                onClick={handleDownloadLogs}
+                disabled={!deploymentStatus.logs.length}
+                style={{
+                  background: 'none', border: '1px solid #374151', borderRadius: '4px',
+                  color: '#9ca3af', cursor: 'pointer',
+                  fontSize: '11px', padding: '2px 8px',
+                }}
+                title="Download logs as .log file"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+
+          {/* Deployment Logs — text is selectable */}
+          <div
+            className="deployment-logs"
+            role="log"
+            aria-live="polite"
             aria-atomic="false"
             onMouseDown={(e) => e.stopPropagation()}
             style={{
@@ -153,6 +245,9 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
               overflowX: 'hidden',
               minHeight: 0,
               maxHeight: '100%',
+              userSelect: 'text',
+              WebkitUserSelect: 'text',
+              cursor: 'text',
             }}
           >
             {deploymentStatus.logs.map((log) => (
@@ -162,11 +257,8 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
                 role="status"
               >
                 <span className="log-time">
-                  {log.timestamp.toLocaleTimeString('en-US', { 
-                    hour12: false, 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit' 
+                  {log.timestamp.toLocaleTimeString('en-US', {
+                    hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',
                   })}
                 </span>
                 {log.nodeName && <span className="log-node">[{log.nodeName}]</span>}

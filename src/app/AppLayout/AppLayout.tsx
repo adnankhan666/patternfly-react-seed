@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
   Masthead,
@@ -33,6 +33,7 @@ interface IAppLayout {
 }
 
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
+  const navigate = useNavigate();
   const { sidebarOpen, toggleSidebar } = useSidebar();
   const { appData } = useAppData(); // Fetch real-time data from API
   const masthead = (
@@ -47,7 +48,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
           />
         </MastheadToggle>
         <MastheadBrand data-codemods>
-          <MastheadLogo data-codemods>
+          <MastheadLogo data-codemods component="a" onClick={(e: React.MouseEvent) => { e.preventDefault(); navigate('/'); }} style={{ cursor: 'pointer' }}>
             <svg height="40px" viewBox="0 0 64.377394 13.229167" style={{ height: '40px', width: 'auto' }}>
               <title>Open Data Hub</title>
               <g transform="translate(-1.3561905e-7,-283.77084)">

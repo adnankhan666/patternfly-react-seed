@@ -202,17 +202,15 @@
 
 /* Helm Deployment Overlay - Full canvas height */
 .execution-overlay.helm-deployment {
-  width: 450px !important;
-  min-width: 450px !important;
-  max-width: 450px !important;
-  height: calc(100vh - 260px) !important;
-  max-height: calc(100vh - 260px) !important;
-  /* JS owns position via transform; override CSS anchors so translate is the sole positioner */
+  width: 540px !important;
+  min-width: 540px !important;
+  max-width: 540px !important;
+  height: calc(100vh - 200px) !important;
+  max-height: calc(100vh - 200px) !important;
   top: 0 !important;
   left: 0 !important;
   right: auto !important;
   overflow: hidden;
-  /* Override slideInDown — it fights with JS transform and causes the jump on open */
   animation: helmFadeIn 0.2s ease !important;
 }
 
