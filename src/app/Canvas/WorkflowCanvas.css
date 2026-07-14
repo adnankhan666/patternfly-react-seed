@@ -2,11 +2,59 @@
   display: flex;
   height: 100%;
   width: 100%;
+  position: relative;
   background: #f9fafb;
+}
+
+.node-panel-wrapper {
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+  transition: width 0.2s ease;
+  width: 280px;
+}
+
+.node-panel-wrapper.collapsed {
+  width: 0;
+}
+
+.node-panel-chevron {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  width: 22px;
+  height: 56px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #374151;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.12);
+  padding: 0;
+}
+
+.node-panel-chevron:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.workflow-container.node-panel-open .node-panel-chevron {
+  left: 280px;
+  border-left: none;
+}
+
+.workflow-container.node-panel-collapsed .node-panel-chevron {
+  left: 0;
 }
 
 .node-panel {
   width: 280px;
+  height: 100%;
   background: white;
   border-right: 1px solid #e5e7eb;
   padding: 16px;
@@ -18,6 +66,26 @@
   font-weight: 600;
   margin: 0 0 16px 0;
   color: #111827;
+}
+
+.node-panel-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+}
+
+.node-panel-divider::before,
+.node-panel-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
 }
 
 .node-list {
@@ -376,6 +444,17 @@
   background: #151515;
 }
 
+.pf-v6-theme-dark .node-panel-chevron {
+  background: #2b2b2b;
+  border-color: #3f3f3f;
+  color: #d2d2d2;
+}
+
+.pf-v6-theme-dark .node-panel-chevron:hover {
+  background: #3f3f3f;
+  color: #fff;
+}
+
 .pf-v6-theme-dark .node-panel {
   background: #1f1f1f;
   border-right-color: #3f3f3f;
@@ -547,7 +626,7 @@
   flex: 1;
   overflow-y: auto !important;
   overflow-x: hidden;
-  background: #1e1e1e;
+  background: rgba(15, 15, 15, 0.82);
   border-radius: 6px;
   padding: 16px;
   margin-bottom: 12px;
@@ -570,19 +649,22 @@
 }
 
 .log-time {
-  color: #6b7280;
+  color: #9ca3af;
   flex-shrink: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .log-node {
-  color: #8b5cf6;
+  color: #a78bfa;
   font-weight: 600;
   flex-shrink: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .log-message {
-  color: #d4d4d4;
+  color: #f3f4f6;
   flex: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .deployment-log-entry.log-success .log-message {

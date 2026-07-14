@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getDeployedPlugins, PLUGIN_DEPLOYED_EVENT } from '../data/pluginRegistry';
 
 export interface NavDataHref {
   id: string;
@@ -23,6 +24,7 @@ export const isNavDataGroup = (navDataItem: NavDataItem): navDataItem is NavData
 // Navigation data based on ODH Dashboard structure
 export const useNavigationData = (): NavDataItem[] => {
   const [dynamicProjects, setDynamicProjects] = React.useState<string[]>([]);
+  const [deployedPluginsVersion, setDeployedPluginsVersion] = React.useState(0);
 
   React.useEffect(() => {
     // Load projects from localStorage
@@ -46,7 +48,21 @@ export const useNavigationData = (): NavDataItem[] => {
     };
   }, []);
 
+  React.useEffect(() => {
+    const refreshDeployedPlugins = () => setDeployedPluginsVersion((v) => v + 1);
+
+    window.addEventListener('storage', refreshDeployedPlugins);
+    window.addEventListener(PLUGIN_DEPLOYED_EVENT, refreshDeployedPlugins);
+
+    return () => {
+      window.removeEventListener('storage', refreshDeployedPlugins);
+      window.removeEventListener(PLUGIN_DEPLOYED_EVENT, refreshDeployedPlugins);
+    };
+  }, []);
+
   return React.useMemo(() => {
+    void deployedPluginsVersion;
+    const deployedPlugins = getDeployedPlugins();
     const navData: NavDataItem[] = [
       // Home
       {
@@ -87,22 +103,6 @@ export const useNavigationData = (): NavDataItem[] => {
             label: 'Overview',
             href: '/canvas',
           },
-          {
-            id: 'canvas-mydsproject-1',
-            label: 'mydsproject-1',
-            href: '/canvas/mydsproject-1',
-          },
-          {
-            id: 'canvas-mydsproject-2',
-            label: 'mydsproject-2',
-            href: '/canvas/mydsproject-2',
-          },
-          {
-            id: 'canvas-mydsproject-3',
-            label: 'mydsproject-3',
-            href: '/canvas/mydsproject-3',
-          },
-          // Add dynamic projects
           ...dynamicProjects.map((project) => ({
             id: `canvas-${project.toLowerCase().replace(/\s+/g, '-')}`,
             label: project,
@@ -180,6 +180,26 @@ export const useNavigationData = (): NavDataItem[] => {
         label: 'Telemetry',
         href: '/telemetry',
       },
+      // Community Plugins (Expandable Group)
+      {
+        id: 'communityPlugins',
+        group: {
+          id: 'communityPlugins',
+          title: 'Community Plugins',
+        },
+        children: [
+          {
+            id: 'plugins-browse',
+            label: 'All Plugins',
+            href: '/plugins',
+          },
+          ...deployedPlugins.map((plugin) => ({
+            id: `plugin-${plugin.id}`,
+            label: plugin.name,
+            href: `/plugins/${plugin.id}/workspace`,
+          })),
+        ],
+      },
       // Settings (Expandable Group - Admin Only)
       {
         id: 'settings',
@@ -218,5 +238,5 @@ export const useNavigationData = (): NavDataItem[] => {
     ];
 
     return navData;
-  }, [dynamicProjects]);
+  }, [dynamicProjects, deployedPluginsVersion]);
 };

@@ -16,3 +16,4 @@ export { HelmGlobalValuesPopover } from './HelmGlobalValuesPopover';
 export { HelmExportModal } from './HelmExportModal';
 export { RepoAnalyzer } from './RepoAnalyzer';
 export { ClusterConnect } from './ClusterConnect';
+export { QuickstartWizard } from './QuickstartWizard';

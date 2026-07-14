@@ -25,6 +25,10 @@ import { useModels } from '../services/apiService';
 const ModelCatalog: React.FunctionComponent = () => {
   const { models, loading, error } = useModels();
 
+  React.useEffect(() => {
+    localStorage.setItem('visitedModelCatalog', 'true');
+  }, []);
+
   const getStatusColor = (state: string) => {
     switch (state) {
       case 'LIVE':

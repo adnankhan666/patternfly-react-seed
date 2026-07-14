@@ -55,12 +55,11 @@ import {
   MapIcon,
   CogIcon,
   PackageIcon,
-  ConnectedIcon,
-  DisconnectedIcon,
-  CloudUploadAltIcon,
+  EllipsisVIcon,
 } from '@patternfly/react-icons';
 import { Alert, AlertGroup, AlertActionCloseButton, AlertVariant } from '@patternfly/react-core';
 import { NodeData, Connection, NODE_TYPES, WorkflowNode, ConnectorPosition, HelmGlobalValues } from './types';
+import { ProjectWorkflowTab } from '../CommunityPlugins/pluginCanvasIntegration';
 import {
   DeploymentStatus,
   DeploymentLog,
@@ -84,8 +83,7 @@ import {
   GRID_SIZE,
   GRID_ENABLED_DEFAULT,
 } from './constants';
-import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm, HelmGlobalValuesPopover, HelmExportModal, ClusterConnect } from './components';
-import { parseClusterName } from './components/ClusterConnect';
+import { ExecutionOverlay, LoadingSpinner, WorkflowMinimap, TemplateSelector, NodePanel, HelmConfigForm, HelmGlobalValuesPopover, HelmExportModal } from './components';
 import { saveWorkflowState, loadWorkflowState } from '../../services/workflowService';
 import { WorkflowTemplate } from '../../data/workflowTemplates';
 import { generateHelmNodeYaml } from './utils/helmYamlGenerator';
@@ -124,6 +122,15 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const navigate = useNavigate();
   const [nodes, setNodes] = React.useState<NodeData[]>([]);
   const [connections, setConnections] = React.useState<Connection[]>([]);
+  const [activeWorkflowTab, setActiveWorkflowTab] = React.useState<string | number>(0);
+  const [projectWorkflows, setProjectWorkflows] = React.useState<ProjectWorkflowTab[]>([
+    {
+      id: 'workflow-1',
+      name: 'Main Workflow',
+      nodes: [],
+      connections: [],
+    },
+  ]);
   const [alerts, setAlerts] = React.useState<AlertInfo[]>([]);
   const [history, setHistory] = React.useState<WorkflowState[]>([{ nodes: [], connections: [] }]);
   const [historyIndex, setHistoryIndex] = React.useState(0);
@@ -200,11 +207,11 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   const [showHelmExportModal, setShowHelmExportModal] = React.useState(false);
   const [savedDeploymentStatus, setSavedDeploymentStatus] = React.useState<DeploymentStatus | null>(null);
 
-  // Cluster connect state
-  const [kubeconfig, setKubeconfig] = React.useState<string | null>(null);
-  const [clusterName, setClusterName] = React.useState<string | null>(null);
-  const [isClusterConnectOpen, setIsClusterConnectOpen] = React.useState(false);
-  const [isDeploying, setIsDeploying] = React.useState(false);
+  // Node panel collapsible state
+  const [nodePanelOpen, setNodePanelOpen] = React.useState(false);
+
+  // Toolbar overflow dropdown state
+  const [isToolbarMoreOpen, setIsToolbarMoreOpen] = React.useState(false);
 
   // Zoom control handlers (memoized with useCallback)
   const handleZoomIn = React.useCallback(() => {
@@ -412,6 +419,28 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     loadProjects();
   }, [projectName]);
 
+  const buildPersistedWorkflowData = React.useCallback((workflowId?: string) => {
+    const activeIndex = activeWorkflowTab as number;
+    const updatedWorkflows = [...projectWorkflows];
+    if (updatedWorkflows[activeIndex]) {
+      updatedWorkflows[activeIndex] = {
+        ...updatedWorkflows[activeIndex],
+        nodes,
+        connections,
+      };
+    }
+
+    return {
+      projectName,
+      nodes,
+      connections,
+      projectWorkflows: updatedWorkflows,
+      activeWorkflowTab: activeIndex,
+      timestamp: new Date().toISOString(),
+      ...(workflowId ? { workflowId } : {}),
+    };
+  }, [activeWorkflowTab, connections, nodes, projectName, projectWorkflows]);
+
   // Load workflow from localStorage on mount
   React.useEffect(() => {
     const loadWorkflow = async () => {
@@ -423,9 +452,29 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           await new Promise(resolve => setTimeout(resolve, 500));
 
           const workflowData = JSON.parse(savedData);
-          if (workflowData.nodes && workflowData.connections) {
+          if (workflowData.projectWorkflows?.length) {
+            const tabIndex = workflowData.activeWorkflowTab ?? 0;
+            const activeWorkflow = workflowData.projectWorkflows[tabIndex] || workflowData.projectWorkflows[0];
+            setProjectWorkflows(workflowData.projectWorkflows);
+            setActiveWorkflowTab(tabIndex);
+            setNodes(activeWorkflow.nodes || []);
+            setConnections(activeWorkflow.connections || []);
+            saveToHistory(activeWorkflow.nodes || [], activeWorkflow.connections || []);
+
+            setTimeout(() => {
+              if ((activeWorkflow.nodes || []).length > 0 && canvasRef.current) {
+                fitToView();
+              }
+            }, 600);
+          } else if (workflowData.nodes && workflowData.connections) {
             setNodes(workflowData.nodes);
             setConnections(workflowData.connections);
+            setProjectWorkflows([{
+              id: 'workflow-1',
+              name: 'Main Workflow',
+              nodes: workflowData.nodes,
+              connections: workflowData.connections,
+            }]);
             saveToHistory(workflowData.nodes, workflowData.connections);
 
             // Fit nodes to view after loading (with a delay to ensure state is updated and canvas is ready)
@@ -559,14 +608,9 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   // Auto-save functionality
   React.useEffect(() => {
     const autoSaveInterval = setInterval(() => {
-      if (nodes.length > 0 || connections.length > 0) {
+      if (nodes.length > 0 || connections.length > 0 || projectWorkflows.length > 1) {
         try {
-          const workflowData = {
-            projectName,
-            nodes,
-            connections,
-            timestamp: new Date().toISOString(),
-          };
+          const workflowData = buildPersistedWorkflowData();
           localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
         } catch (error) {
           console.error('Auto-save failed:', error);
@@ -577,7 +621,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     return () => {
       clearInterval(autoSaveInterval);
     };
-  }, [nodes, connections, projectName]);
+  }, [nodes, connections, projectName, projectWorkflows, buildPersistedWorkflowData]);
 
   // Add/remove class to body when drawer opens/closes
   React.useEffect(() => {
@@ -953,21 +997,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   // Minimap visibility state
   const [isMinimapOpen, setIsMinimapOpen] = React.useState(false);
 
-  // Workflow tabs state
-  const [activeWorkflowTab, setActiveWorkflowTab] = React.useState<string | number>(0);
-  const [projectWorkflows, setProjectWorkflows] = React.useState<Array<{
-    id: string;
-    name: string;
-    nodes: NodeData[];
-    connections: Connection[];
-  }>>([
-    {
-      id: 'workflow-1',
-      name: 'Main Workflow',
-      nodes: [],
-      connections: [],
-    },
-  ]);
+  // Workflow tabs state (activeWorkflowTab and projectWorkflows declared near top of component)
 
   // Handle workflow tab switching
   const handleWorkflowTabSwitch = React.useCallback((event: React.MouseEvent<any> | React.KeyboardEvent | MouseEvent, tabIndex: string | number) => {
@@ -1099,13 +1129,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       }
 
       // Also save to localStorage as backup
-      const workflowData = {
-        projectName,
-        nodes,
-        connections,
-        timestamp: new Date().toISOString(),
-        workflowId: savedWorkflow.id,
-      };
+      const workflowData = buildPersistedWorkflowData(savedWorkflow.id);
       localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
 
       addAlert('Workflow saved successfully to database!', AlertVariant.success);
@@ -1113,12 +1137,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       console.error('Error saving workflow:', error);
       // Fallback to localStorage only
       try {
-        const workflowData = {
-          projectName,
-          nodes,
-          connections,
-          timestamp: new Date().toISOString(),
-        };
+        const workflowData = buildPersistedWorkflowData();
         localStorage.setItem(`workflow-${projectName}`, JSON.stringify(workflowData));
 
         addAlert('Workflow saved locally (database unavailable)', AlertVariant.warning);
@@ -1128,7 +1147,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     } finally {
       setIsLoading(false);
     }
-  }, [currentWorkflowId, projectName, nodes, connections, addAlert]);
+  }, [currentWorkflowId, projectName, nodes, connections, addAlert, buildPersistedWorkflowData]);
 
   // Memoize execution order (expensive topological sort)
   const executionOrder = React.useMemo(() => {
@@ -1520,142 +1539,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length, isExecuting, executionOrder, connections, addAlert, helmGlobalValues.namespace, addDeploymentLog, updateNodeStatus]);
 
-  // Deploy to real cluster via SSE
-  const handleDeployToCluster = React.useCallback(async () => {
-    if (!kubeconfig) {
-      addAlert('Connect a cluster first', AlertVariant.warning);
-      return;
-    }
-    const helmNodes = nodes.filter((n) => n.data?.helmConfig);
-    if (helmNodes.length === 0) {
-      addAlert('No Helm nodes found in this workflow', AlertVariant.warning);
-      return;
-    }
-
-    // Build manifests array from existing YAML generator
-    const manifests = helmNodes
-      .map((n) => {
-        const resourceType = n.data?.helmConfig?.resourceType;
-        const values = n.data?.helmConfig?.values || {};
-        if (!resourceType) return null;
-        const yaml = generateHelmNodeYaml(resourceType, values, helmGlobalValues);
-        return { nodeId: n.id, nodeName: n.label, resourceType, yaml };
-      })
-      .filter(Boolean);
-
-    // Build nodeName → nodeId lookup
-    const nameToId = new Map<string, string>();
-    helmNodes.forEach((n) => nameToId.set(n.label, n.id));
-
-    // Reset all visual state
-    setExecutingNodes(new Set());
-    setCompletedNodes(new Set());
-    setFailedNodes(new Set());
-
-    const initialStatus: DeploymentStatus = {
-      phase: 1,
-      totalPhases: 6,
-      currentPhaseProgress: 0,
-      logs: [],
-      nodeStatuses: new Map(),
-    };
-    setDeploymentStatus(initialStatus);
-    setIsDeploying(true);
-    setIsExecuting(true);
-    addAlert('Starting cluster deployment...', AlertVariant.info);
-
-    // Mark all helm nodes as executing initially
-    setExecutingNodes(new Set(helmNodes.map((n) => n.id)));
-
-    const API_BASE = process.env.API_URL || 'http://localhost:3001';
-    let hasError = false;
-
-    try {
-      const response = await fetch(`${API_BASE}/api/cluster-deploy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kubeconfig, manifests, globals: helmGlobalValues }),
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === 'phase') {
-              setDeploymentStatus((prev) => prev ? { ...prev, phase: event.phase } : prev);
-            } else if (event.type === 'log') {
-              addDeploymentLog(event.phase, event.message, event.logType || 'info', undefined, event.nodeName);
-
-              // Track node visual state from SSE log events
-              const nodeId = event.nodeName ? nameToId.get(event.nodeName) : undefined;
-              if (nodeId) {
-                if (event.logType === 'error') {
-                  setFailedNodes((prev) => new Set([...prev, nodeId]));
-                  setExecutingNodes((prev) => { const s = new Set(prev); s.delete(nodeId); return s; });
-                } else if (event.logType === 'success' && /created|patched|ready|completed/i.test(event.message)) {
-                  setCompletedNodes((prev) => new Set([...prev, nodeId]));
-                  setExecutingNodes((prev) => { const s = new Set(prev); s.delete(nodeId); return s; });
-                }
-              }
-            } else if (event.type === 'done') {
-              // Move any remaining executing nodes to completed
-              setExecutingNodes((prev) => {
-                setCompletedNodes((c) => new Set([...c, ...prev]));
-                return new Set();
-              });
-              setIsDeploying(false);
-              setIsExecuting(false);
-              addAlert('Cluster deployment complete!', AlertVariant.success);
-            } else if (event.type === 'error') {
-              hasError = true;
-              addDeploymentLog(event.phase || 1, event.message, 'error');
-              // Mark all still-executing nodes as failed
-              setExecutingNodes((prev) => {
-                setFailedNodes((f) => new Set([...f, ...prev]));
-                return new Set();
-              });
-              setIsDeploying(false);
-              setIsExecuting(false);
-              addAlert(`Deployment error: ${event.message}`, AlertVariant.danger);
-            }
-          } catch {
-            // malformed event — skip
-          }
-        }
-      }
-    } catch (err: unknown) {
-      hasError = true;
-      const msg = err instanceof Error ? err.message : String(err);
-      addAlert(`Deployment failed: ${msg}`, AlertVariant.danger);
-      // Mark all still-executing nodes as failed
-      setExecutingNodes((prev) => {
-        setFailedNodes((f) => new Set([...f, ...prev]));
-        return new Set();
-      });
-      setIsDeploying(false);
-      setIsExecuting(false);
-    }
-
-    // Only start flow animation if there were no errors
-    if (!hasError) {
-      startOngoingFlow();
-    }
-  }, [kubeconfig, nodes, helmGlobalValues, addAlert, addDeploymentLog, generateHelmNodeYaml, startOngoingFlow]);
-
   // Ref to track if ongoing animation should continue
   const ongoingFlowRef = React.useRef<boolean>(false);
   const animationFrameRef = React.useRef<number>(0);
@@ -1996,88 +1879,8 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                   <ToolbarContent>
                     <ToolbarGroup>
                       <ToolbarItem>
-                        <Button variant="secondary" icon={<PlusIcon />} onClick={handleNew}>
-                          New
-                        </Button>
-                      </ToolbarItem>
-                      <ToolbarItem>
-                        <Button
-                          variant="secondary"
-                          icon={<CubesIcon />}
-                          onClick={() => setIsTemplateSelectorOpen(true)}
-                          title="Load a workflow template"
-                        >
-                          Load Template
-                        </Button>
-                      </ToolbarItem>
-                      <ToolbarItem>
                         <Button variant="secondary" icon={<SaveIcon />} onClick={handleSave}>
                           Save
-                        </Button>
-                      </ToolbarItem>
-                      <ToolbarItem>
-                        <HelmGlobalValuesPopover
-                          values={helmGlobalValues}
-                          onChange={setHelmGlobalValues}
-                        >
-                          <Button
-                            variant="secondary"
-                            icon={<CogIcon />}
-                            title="Configure global Helm values"
-                            isDisabled={!helmMode}
-                            style={{ display: helmMode ? 'inline-flex' : 'none' }}
-                          >
-                            Global Values
-                          </Button>
-                        </HelmGlobalValuesPopover>
-                      </ToolbarItem>
-                      <ToolbarItem>
-                        <Button
-                          variant="secondary"
-                          icon={<PackageIcon />}
-                          onClick={() => setShowHelmExportModal(true)}
-                          title="Export Helm chart"
-                          isDisabled={!helmMode}
-                          style={{ display: helmMode ? 'inline-flex' : 'none' }}
-                        >
-                          Export Helm Chart
-                        </Button>
-                      </ToolbarItem>
-                      {savedDeploymentStatus && helmMode && (
-                        <ToolbarItem>
-                          <Button
-                            variant="secondary"
-                            icon={<CommentsIcon />}
-                            onClick={() => {
-                              console.log('Opening saved deployment logs');
-                              setDeploymentStatus(savedDeploymentStatus);
-                            }}
-                            title="View deployment logs"
-                          >
-                            View Logs
-                          </Button>
-                        </ToolbarItem>
-                      )}
-                      <ToolbarItem>
-                        <Button
-                          variant="secondary"
-                          icon={<DownloadIcon />}
-                          onClick={handleExport}
-                          isLoading={isExporting}
-                          isDisabled={isExporting || isImporting || isLoading}
-                        >
-                          {isExporting ? 'Exporting...' : 'Export'}
-                        </Button>
-                      </ToolbarItem>
-                      <ToolbarItem>
-                        <Button
-                          variant="secondary"
-                          icon={<UploadIcon />}
-                          onClick={handleImport}
-                          isLoading={isImporting}
-                          isDisabled={isImporting || isExporting || isLoading}
-                        >
-                          {isImporting ? 'Importing...' : 'Import'}
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
@@ -2085,21 +1888,16 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           variant="primary"
                           icon={<PlayIcon />}
                           onClick={handleExecute}
-                          isDisabled={isExecuting || isImporting || isExporting || isLoading || isDeploying}
+                          isDisabled={isExecuting || isImporting || isExporting || isLoading}
                         >
                           Execute
                         </Button>
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="link" icon={<UndoIcon />} onClick={undo} isDisabled={!canUndo} aria-label="Undo" />
+                        <Button variant="plain" icon={<UndoIcon />} onClick={undo} isDisabled={!canUndo} aria-label="Undo" title="Undo" />
                       </ToolbarItem>
                       <ToolbarItem>
-                        <Button variant="link" icon={<RedoIcon />} onClick={redo} isDisabled={!canRedo} aria-label="Redo" />
-                      </ToolbarItem>
-                      <ToolbarItem>
-                        <Button variant="link" onClick={handleClear}>
-                          Clear
-                        </Button>
+                        <Button variant="plain" icon={<RedoIcon />} onClick={redo} isDisabled={!canRedo} aria-label="Redo" title="Redo" />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
@@ -2107,25 +1905,33 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           icon={<ThIcon />}
                           onClick={toggleGrid}
                           aria-label={gridEnabled ? 'Disable grid' : 'Enable grid'}
+                          title={gridEnabled ? 'Disable grid' : 'Enable grid'}
                         />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
-                          variant="link"
+                          variant="plain"
                           icon={<SearchPlusIcon />}
                           onClick={handleZoomIn}
                           isDisabled={zoom >= MAX_ZOOM}
                           aria-label="Zoom in"
+                          title="Zoom in"
                         />
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
-                          variant="link"
+                          variant="plain"
                           icon={<SearchMinusIcon />}
                           onClick={handleZoomOut}
                           isDisabled={zoom <= MIN_ZOOM}
                           aria-label="Zoom out"
+                          title="Zoom out"
                         />
+                      </ToolbarItem>
+                      <ToolbarItem>
+                        <span style={{ fontSize: '12px', padding: '0 4px', color: '#6b7280', minWidth: '40px', textAlign: 'center' }}>
+                          {Math.round(zoom * 100)}%
+                        </span>
                       </ToolbarItem>
                       <ToolbarItem>
                         <Button
@@ -2136,6 +1942,51 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                           title={isMinimapOpen ? 'Hide minimap' : 'Show minimap'}
                         />
                       </ToolbarItem>
+                      <ToolbarItem>
+                        <Dropdown
+                          isOpen={isToolbarMoreOpen}
+                          onSelect={() => setIsToolbarMoreOpen(false)}
+                          onOpenChange={(isOpen: boolean) => setIsToolbarMoreOpen(isOpen)}
+                          popperProps={{ position: 'end' }}
+                          toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                            <MenuToggle
+                              ref={toggleRef}
+                              variant="plain"
+                              onClick={() => setIsToolbarMoreOpen(!isToolbarMoreOpen)}
+                              isExpanded={isToolbarMoreOpen}
+                              aria-label="More actions"
+                            >
+                              <EllipsisVIcon />
+                            </MenuToggle>
+                          )}
+                        >
+                          <DropdownList>
+                            <DropdownItem key="new" icon={<PlusIcon />} onClick={handleNew}>New Workflow</DropdownItem>
+                            <DropdownItem key="template" icon={<CubesIcon />} onClick={() => setIsTemplateSelectorOpen(true)}>Load Template</DropdownItem>
+                            <DropdownItem key="export" icon={<DownloadIcon />} onClick={handleExport} isDisabled={isExporting || isImporting || isLoading}>Export</DropdownItem>
+                            <DropdownItem key="import" icon={<UploadIcon />} onClick={handleImport} isDisabled={isImporting || isExporting || isLoading}>Import</DropdownItem>
+                            <DropdownItem key="clear" onClick={handleClear}>Clear Canvas</DropdownItem>
+                            {helmMode && (
+                              <>
+                                <DropdownItem key="helm-export" icon={<PackageIcon />} onClick={() => setShowHelmExportModal(true)}>Export Helm Chart</DropdownItem>
+                                {savedDeploymentStatus && (
+                                  <DropdownItem key="view-logs" icon={<CommentsIcon />} onClick={() => setDeploymentStatus(savedDeploymentStatus)}>View Logs</DropdownItem>
+                                )}
+                              </>
+                            )}
+                          </DropdownList>
+                        </Dropdown>
+                      </ToolbarItem>
+                      {helmMode && (
+                        <ToolbarItem>
+                          <HelmGlobalValuesPopover
+                            values={helmGlobalValues}
+                            onChange={setHelmGlobalValues}
+                          >
+                            <Button variant="plain" icon={<CogIcon />} aria-label="Global Helm values" title="Global Helm values" />
+                          </HelmGlobalValuesPopover>
+                        </ToolbarItem>
+                      )}
                     </ToolbarGroup>
                   </ToolbarContent>
                 </Toolbar>
@@ -2144,70 +1995,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           </CardBody>
         </Card>
       </FlexItem>
-
-      {/* Row 2 — Cluster Deployment (shown whenever Helm nodes are present) */}
-      {nodes.some((n) => n.data?.helmConfig) && (
-        <FlexItem>
-          <Card isCompact>
-            <CardBody style={{ padding: '8px 16px' }}>
-              <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
-                <FlexItem>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Cluster Deploy
-                  </span>
-                </FlexItem>
-                <FlexItem>
-                  <Button
-                    variant={kubeconfig ? 'secondary' : 'secondary'}
-                    icon={kubeconfig ? <ConnectedIcon /> : <DisconnectedIcon />}
-                    onClick={() => setIsClusterConnectOpen(true)}
-                    style={kubeconfig ? { borderColor: '#16a34a', color: '#16a34a' } : {}}
-                  >
-                    {kubeconfig ? clusterName : 'Connect Cluster'}
-                  </Button>
-                </FlexItem>
-                {kubeconfig && (
-                  <>
-                    <FlexItem>
-                      <Button
-                        variant="primary"
-                        icon={<CloudUploadAltIcon />}
-                        onClick={handleDeployToCluster}
-                        isDisabled={isDeploying || isExecuting}
-                        isLoading={isDeploying}
-                        style={{ background: '#7c3aed', borderColor: '#7c3aed' }}
-                      >
-                        {isDeploying ? 'Deploying...' : 'Deploy to Cluster'}
-                      </Button>
-                    </FlexItem>
-                    <FlexItem>
-                      <Button
-                        variant="link"
-                        icon={<DisconnectedIcon />}
-                        onClick={() => {
-                          setKubeconfig(null);
-                          setClusterName(null);
-                          addAlert('Disconnected from cluster', AlertVariant.info);
-                        }}
-                        style={{ color: '#dc2626' }}
-                      >
-                        Disconnect
-                      </Button>
-                    </FlexItem>
-                  </>
-                )}
-                {!kubeconfig && (
-                  <FlexItem>
-                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                      Connect a cluster to enable real Kubernetes deployment
-                    </span>
-                  </FlexItem>
-                )}
-              </Flex>
-            </CardBody>
-          </Card>
-        </FlexItem>
-      )}
 
       {/* Workflow Tabs */}
       <FlexItem>
@@ -2671,9 +2458,20 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
             }
           >
             <DrawerContentBody>
-              <div className="workflow-container">
-                {/* Node Panel */}
-                <NodePanel onDragStart={handleDragStart} helmMode={helmMode} />
+              <div className={`workflow-container ${nodePanelOpen ? 'node-panel-open' : 'node-panel-collapsed'}`}>
+                <div className={`node-panel-wrapper ${nodePanelOpen ? 'open' : 'collapsed'}`}>
+                  <NodePanel onDragStart={handleDragStart} helmMode={helmMode} />
+                </div>
+                <button
+                  type="button"
+                  className="node-panel-chevron"
+                  onClick={() => setNodePanelOpen((open) => !open)}
+                  aria-label={nodePanelOpen ? 'Collapse nodes panel' : 'Expand nodes panel'}
+                  aria-expanded={nodePanelOpen}
+                  title={nodePanelOpen ? 'Hide nodes panel' : 'Show nodes panel'}
+                >
+                  {nodePanelOpen ? '\u25C0' : '\u25B6'}
+                </button>
 
                 {/* Canvas */}
                 <div
@@ -3053,7 +2851,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                     />
                   )}
 
-                  {/* Workflow Minimap - outside transformed content */}
+                  {/* Workflow Minimap */}
                   {isMinimapOpen && nodes.length > 0 && (
                     <WorkflowMinimap
                       nodes={nodes}
@@ -3150,7 +2948,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
               await downloadHelmChart(nodes, connections, helmGlobalValues);
               setShowHelmExportModal(false);
               addAlert({
-                title: `Helm chart ${globals.chartName}-${globals.chartVersion}.tgz exported successfully`,
+                title: `Helm chart ${helmGlobalValues.chartName}-${helmGlobalValues.chartVersion}.tgz exported successfully`,
                 variant: AlertVariant.success,
               });
             } catch (error) {
@@ -3163,23 +2961,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           }}
         />
       )}
-
-      <ClusterConnect
-        isOpen={isClusterConnectOpen}
-        onClose={() => setIsClusterConnectOpen(false)}
-        onConnect={(kc) => {
-          setKubeconfig(kc);
-          setClusterName(parseClusterName(kc));
-          addAlert(`Connected to cluster: ${parseClusterName(kc)}`, AlertVariant.success);
-        }}
-        onDisconnect={() => {
-          setKubeconfig(null);
-          setClusterName(null);
-          addAlert('Disconnected from cluster', AlertVariant.info);
-        }}
-        isConnected={!!kubeconfig}
-        clusterName={clusterName}
-      />
 
     </Flex>
   );

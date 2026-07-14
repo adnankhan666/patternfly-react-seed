@@ -29,6 +29,7 @@ export interface WorkflowNode {
   description: string;
   icon?: string;
   color: string;
+  pluginSource?: string;
 }
 
 export const NODE_TYPES: WorkflowNode[] = [

@@ -22,10 +22,10 @@ import {
   ToolbarItem,
 } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
-import { useNavigationData, isNavDataGroup, NavDataItem, NavDataHref, NavDataGroup } from '@app/navData';
+import { useNavigationData, isNavDataGroup, NavDataHref, NavDataGroup } from '@app/navData';
 import { ChatBot } from '../ChatBot/ChatBot';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { useAppData } from '../hooks/useAppData';
+import { GuidedTour } from '../components/GuidedTour';
 import { useSidebar } from '../contexts/SidebarContext';
 
 interface IAppLayout {
@@ -34,8 +34,7 @@ interface IAppLayout {
 
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const navigate = useNavigate();
-  const { sidebarOpen, toggleSidebar } = useSidebar();
-  const { appData } = useAppData(); // Fetch real-time data from API
+  const { sidebarOpen, setSidebarOpen, toggleSidebar } = useSidebar();
   const masthead = (
     <Masthead>
       <MastheadMain>
@@ -107,6 +106,10 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const location = useLocation();
   const navigationData = useNavigationData();
 
+  React.useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname, setSidebarOpen]);
+
   const renderNavItem = (item: NavDataHref) => (
     <NavItem key={item.id} id={item.id} isActive={item.href === location.pathname}>
       <NavLink to={item.href}>{item.label}</NavLink>
@@ -161,8 +164,10 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         {children}
       </Page>
 
-      {/* Global ChatBot with real-time application data from API */}
-      <ChatBot workflowContext={appData} />
+      <ChatBot workflowContext={{}} />
+
+      {/* First-time user guided tour */}
+      <GuidedTour />
     </>
   );
 };

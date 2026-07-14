@@ -58,43 +58,33 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
     }
   }, [deploymentStatus?.logs]);
 
-  // Draggable state — position is absolute (left/top from viewport origin via transform)
-  const [position, setPosition] = React.useState({ x: 0, y: 0 });
-  const [initialized, setInitialized] = React.useState(false);
-
+  // Compute top offset so the overlay sits inside the canvas grid area
+  const [canvasTop, setCanvasTop] = React.useState<number | null>(null);
   React.useEffect(() => {
-    if (initialized) return;
     const canvas = document.querySelector('.workflow-canvas');
     if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      setPosition({
-        x: rect.right - 556,
-        y: rect.top + 8,
-      });
-    } else {
-      setPosition({
-        x: typeof window !== 'undefined' ? window.innerWidth - 556 : 720,
-        y: 80,
-      });
+      setCanvasTop(canvas.getBoundingClientRect().top + 12);
     }
-    setInitialized(true);
-  }, [initialized]);
+  }, [deploymentStatus]);
+
+  // Drag offset from the default CSS position
+  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
-  const dragOffset = React.useRef({ x: 0, y: 0 });
+  const dragStart = React.useRef({ mouseX: 0, mouseY: 0, offsetX: 0, offsetY: 0 });
   const overlayRef = React.useRef<HTMLDivElement>(null);
 
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
-    dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+    dragStart.current = { mouseX: e.clientX, mouseY: e.clientY, offsetX: dragOffset.x, offsetY: dragOffset.y };
     setIsDragging(true);
     e.preventDefault();
-  }, [position]);
+  }, [dragOffset]);
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (!isDragging || !overlayRef.current) return;
-    const overlayRect = overlayRef.current.getBoundingClientRect();
-    const newX = Math.max(0, Math.min(e.clientX - dragOffset.current.x, window.innerWidth - overlayRect.width - 10));
-    const newY = Math.max(0, Math.min(e.clientY - dragOffset.current.y, window.innerHeight - overlayRect.height - 10));
-    setPosition({ x: newX, y: newY });
+    if (!isDragging) return;
+    setDragOffset({
+      x: dragStart.current.offsetX + (e.clientX - dragStart.current.mouseX),
+      y: dragStart.current.offsetY + (e.clientY - dragStart.current.mouseY),
+    });
   }, [isDragging]);
 
   const handleMouseUp = React.useCallback(() => {
@@ -147,10 +137,8 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
         aria-labelledby="deployment-title"
         aria-live="polite"
         style={{
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          width: '540px',
-          height: 'calc(100vh - 240px)',
-          maxHeight: 'calc(100vh - 240px)',
+          top: canvasTop ?? undefined,
+          transform: dragOffset.x || dragOffset.y ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined,
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -306,7 +294,8 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
       aria-busy="true"
       onMouseDown={handleMouseDown}
       style={{
-        transform: `translate(${position.x}px, ${position.y}px)`,
+        top: canvasTop ?? undefined,
+        transform: dragOffset.x || dragOffset.y ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined,
         cursor: isDragging ? 'grabbing' : 'move',
       }}
     >

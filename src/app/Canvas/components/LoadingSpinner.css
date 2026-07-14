@@ -104,8 +104,8 @@
   position: fixed;
   top: 250px;
   right: 24px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(4px);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   padding: 16px 20px;
@@ -200,16 +200,15 @@
   letter-spacing: 0.5px;
 }
 
-/* Helm Deployment Overlay - Full canvas height */
+/* Helm Deployment Overlay - constrained to viewport */
 .execution-overlay.helm-deployment {
-  width: 540px !important;
-  min-width: 540px !important;
-  max-width: 540px !important;
-  height: calc(100vh - 200px) !important;
-  max-height: calc(100vh - 200px) !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: auto !important;
+  width: min(540px, calc(100vw - 32px)) !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 32px) !important;
+  height: min(600px, calc(100vh - 120px)) !important;
+  max-height: calc(100vh - 120px) !important;
+  right: 16px !important;
+  left: auto !important;
   overflow: hidden;
   animation: helmFadeIn 0.2s ease !important;
 }

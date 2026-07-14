@@ -1,53 +1,107 @@
-/* Splash Screen Overlay */
+/* Fullscreen Splash Overlay */
 .splash-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: linear-gradient(135deg, #c2185b 0%, #e05577 30%, #f47c8e 60%, #ff9aaa 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 2rem;
   z-index: 10000;
-  animation: fadeOut 5s ease-in-out forwards;
+  cursor: pointer;
+  transition: opacity 0.8s ease-out;
 }
 
-/* Splash Content Container */
+.splash-overlay.splash-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .splash-content {
   text-align: center;
   position: relative;
+  z-index: 1;
 }
 
-/* Splash Text Wrapper for multiple DropText components */
-.splash-text-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-/* Splash Text */
-.splash-text {
-  font-size: 4rem;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  padding: 0;
-}
-
-/* Transition Text - "Let's get started" */
 .splash-transition-text {
+  position: relative;
+  z-index: 1;
   font-size: 2rem;
   font-weight: 500;
   color: #ffffff;
   margin: 0;
   padding: 0;
   opacity: 0;
-  animation: fadeInTransition 1s ease-in-out 3.2s forwards;
+  text-align: center;
+  width: 100%;
+  animation: fadeInText 1s ease-in-out 3.2s forwards;
+}
+
+.splash-skip {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+  cursor: pointer;
+  opacity: 0;
+  animation: fadeInSkip 0.5s ease-in-out 2s forwards;
+  transition: color 0.2s;
+}
+
+.splash-skip:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes fadeInText {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInSkip {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Hero Bar (shown after splash dismisses) */
+.dashboard-hero-bar {
+  background: linear-gradient(135deg, #c2185b 0%, #e05577 50%, #f47c8e 100%);
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+}
+
+.dashboard-hero-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard-hero-subtitle {
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0.5rem 0 0;
 }
 
 /* Dust Container */
@@ -74,7 +128,7 @@
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
-/* Individual dust particle animations - EXPLOSIVE burst on impact (100ms initial delay + 350ms fall = 450ms) */
+/* Individual dust particle animations */
 .dust-1 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
 .dust-2 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
 .dust-3 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
@@ -88,7 +142,6 @@
 .dust-11 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.45s forwards; }
 .dust-12 { animation: dustExplosion 0.5s cubic-bezier(0.19, 1, 0.22, 1) 0.455s forwards; }
 
-/* Dust explosion animation - VIOLENT instant burst */
 @keyframes dustExplosion {
   0% {
     opacity: 0;
@@ -106,24 +159,6 @@
   }
 }
 
-/* Old dust spread animation - kept for reference */
-@keyframes dustSpread {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0);
-  }
-  15% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(
-      calc(var(--dust-x, 0) * 250px),
-      calc(var(--dust-y, 0) * -120px)
-    ) scale(3);
-  }
-}
-
 /* Assign random directions to each particle */
 .dust-1 { --dust-x: -1.2; --dust-y: 0.8; }
 .dust-2 { --dust-x: 1.2; --dust-y: 0.9; }
@@ -138,67 +173,18 @@
 .dust-11 { --dust-x: -0.3; --dust-y: 1.15; }
 .dust-12 { --dust-x: 0.4; --dust-y: 0.95; }
 
-/* Drop-Thud Animation - Dramatic drop with multiple bounces */
-@keyframes dropThud {
-  0% {
-    transform: translateY(-150vh) scale(0.5) rotate(-8deg);
-    opacity: 0;
-  }
-  60% {
-    transform: translateY(0) scale(1.2);
-    opacity: 1;
-  }
-  70% {
-    transform: translateY(-40px) scale(0.95);
-  }
-  80% {
-    transform: translateY(0) scale(1.1);
-  }
-  85% {
-    transform: translateY(-20px) scale(0.98);
-  }
-  90% {
-    transform: translateY(0) scale(1.05);
-  }
-  95% {
-    transform: translateY(-8px) scale(0.99);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-/* Fade Out Animation */
-@keyframes fadeOut {
-  0% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    visibility: hidden;
-  }
-}
-
-/* Fade in transition for "Let's get started" */
-@keyframes fadeInTransition {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
-  .splash-text {
-    font-size: 2.5rem;
+  .dashboard-hero-bar {
+    padding: 1.5rem 1rem;
+  }
+
+  .dashboard-hero-title {
+    font-size: 1.75rem;
+  }
+
+  .dashboard-hero-subtitle {
+    font-size: 0.9rem;
   }
 
   .splash-transition-text {
@@ -207,8 +193,12 @@
 }
 
 @media (max-width: 480px) {
-  .splash-text {
-    font-size: 2rem;
+  .dashboard-hero-title {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-hero-subtitle {
+    font-size: 0.85rem;
   }
 
   .splash-transition-text {

@@ -1,0 +1,65 @@
+.workspace-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.workspace-table th,
+.workspace-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.workspace-table th {
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.workspace-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.pf-v6-theme-dark .workspace-table th {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+
+.pf-v6-theme-dark .workspace-table th,
+.pf-v6-theme-dark .workspace-table td {
+  border-bottom-color: #374151;
+}
+
+.pf-v6-theme-dark .workspace-table tbody tr:hover {
+  background: #1f2937;
+}
+
+.workspace-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.workspace-metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.workspace-metric-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.pf-v6-theme-dark .workspace-metric-value {
+  color: #f9fafb;
+}
+
+.pf-v6-theme-dark .workspace-metric-label {
+  color: #9ca3af;
+}

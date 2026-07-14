@@ -31,7 +31,10 @@ export const ThemeProvider: React.FunctionComponent<ThemeProviderProps> = ({ chi
     return 'light';
   });
 
-  // Apply theme to document root
+  const [isManuallySet, setIsManuallySet] = React.useState(() =>
+    localStorage.getItem('app-theme') !== null
+  );
+
   React.useEffect(() => {
     const root = document.documentElement;
 
@@ -43,26 +46,16 @@ export const ThemeProvider: React.FunctionComponent<ThemeProviderProps> = ({ chi
       root.classList.remove('pf-v6-theme-dark');
     }
 
-    // Persist theme preference
-    localStorage.setItem('app-theme', theme);
-
-    // Track theme change in analytics
-    if (window.mixpanel) {
-      window.mixpanel.track('Theme Changed', {
-        theme,
-        timestamp: new Date().toISOString(),
-      });
+    if (isManuallySet) {
+      localStorage.setItem('app-theme', theme);
     }
-  }, [theme]);
+  }, [theme, isManuallySet]);
 
-  // Listen for system theme changes
   React.useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const handleChange = (e: MediaQueryListEvent) => {
-      // Only auto-switch if user hasn't manually set a preference
-      const hasManualPreference = localStorage.getItem('app-theme');
-      if (!hasManualPreference) {
+      if (!isManuallySet) {
         setThemeState(e.matches ? 'dark' : 'light');
       }
     };
@@ -72,13 +65,15 @@ export const ThemeProvider: React.FunctionComponent<ThemeProviderProps> = ({ chi
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
-  }, []);
+  }, [isManuallySet]);
 
   const toggleTheme = React.useCallback(() => {
+    setIsManuallySet(true);
     setThemeState((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
   }, []);
 
   const setTheme = React.useCallback((newTheme: Theme) => {
+    setIsManuallySet(true);
     setThemeState(newTheme);
   }, []);
 

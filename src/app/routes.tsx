@@ -15,10 +15,12 @@ const Dashboard = React.lazy(() => import('@app/Dashboard/Dashboard').then(m => 
 const EnabledApplications = React.lazy(() => import('@app/Applications/EnabledApplications').then(m => ({ default: m.EnabledApplications })));
 const ExploreApplications = React.lazy(() => import('@app/Applications/ExploreApplications').then(m => ({ default: m.ExploreApplications })));
 const Canvas = React.lazy(() => import('@app/Canvas/Canvas').then(m => ({ default: m.Canvas })));
-const MyDSProject1 = React.lazy(() => import('@app/Canvas/MyDSProject1').then(m => ({ default: m.MyDSProject1 })));
-const MyDSProject2 = React.lazy(() => import('@app/Canvas/MyDSProject2').then(m => ({ default: m.MyDSProject2 })));
-const MyDSProject3 = React.lazy(() => import('@app/Canvas/MyDSProject3').then(m => ({ default: m.MyDSProject3 })));
 const DynamicProject = React.lazy(() => import('@app/Canvas/DynamicProject').then(m => ({ default: m.DynamicProject })));
+const QuickstartWizard = React.lazy(() => import('@app/Canvas/components/QuickstartWizard').then(m => ({ default: m.QuickstartWizard })));
+const PluginBrowse = React.lazy(() => import('@app/CommunityPlugins/PluginBrowse').then(m => ({ default: m.PluginBrowse })));
+const PluginDetail = React.lazy(() => import('@app/CommunityPlugins/PluginDetail').then(m => ({ default: m.PluginDetail })));
+const PluginWorkspace = React.lazy(() => import('@app/CommunityPlugins/PluginWorkspace').then(m => ({ default: m.PluginWorkspace })));
+const BYOHWizard = React.lazy(() => import('@app/CommunityPlugins/BYOHWizard').then(m => ({ default: m.BYOHWizard })));
 const Projects = React.lazy(() => import('@app/Projects/Projects').then(m => ({ default: m.Projects })));
 const Pipelines = React.lazy(() => import('@app/Pipelines/Pipelines').then(m => ({ default: m.Pipelines })));
 const PipelineRuns = React.lazy(() => import('@app/Pipelines/PipelineRuns').then(m => ({ default: m.PipelineRuns })));
@@ -88,28 +90,40 @@ const routes: AppRouteConfig[] = [
     title: 'ODH Dashboard | Canvas',
   },
   {
-    element: <MyDSProject1 />,
-    exact: true,
-    path: '/canvas/mydsproject-1',
-    title: 'ODH Dashboard | mydsproject-1',
-  },
-  {
-    element: <MyDSProject2 />,
-    exact: true,
-    path: '/canvas/mydsproject-2',
-    title: 'ODH Dashboard | mydsproject-2',
-  },
-  {
-    element: <MyDSProject3 />,
-    exact: true,
-    path: '/canvas/mydsproject-3',
-    title: 'ODH Dashboard | mydsproject-3',
-  },
-  {
     element: <DynamicProject />,
     exact: true,
     path: '/canvas/:projectName',
     title: 'ODH Dashboard | Project',
+  },
+  {
+    element: <QuickstartWizard />,
+    exact: true,
+    path: '/quickstart',
+    title: 'ODH Dashboard | Quickstart',
+  },
+  {
+    element: <PluginBrowse />,
+    exact: true,
+    path: '/plugins',
+    title: 'ODH Dashboard | Community Plugins',
+  },
+  {
+    element: <BYOHWizard />,
+    exact: true,
+    path: '/plugins/lemonade/byoh',
+    title: 'ODH Dashboard | BYOH Deploy',
+  },
+  {
+    element: <PluginDetail />,
+    exact: true,
+    path: '/plugins/:pluginId',
+    title: 'ODH Dashboard | Plugin Details',
+  },
+  {
+    element: <PluginWorkspace />,
+    exact: true,
+    path: '/plugins/:pluginId/workspace',
+    title: 'ODH Dashboard | Plugin Workspace',
   },
   {
     element: <Projects />,
