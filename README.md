@@ -2,26 +2,48 @@
 
 A visual, self-service platform for deploying and managing AI/ML workloads on Kubernetes. Built on PatternFly, it replaces manual YAML authoring with a guided wizard, a visual Canvas for resource topology, and an extensible plugin marketplace.
 
+![Dashboard](docs/screenshots/01-dashboard.png)
+
 ## Key Features
-
-### BYOH (Bring Your Own Helm) Wizard
-
-A 4-step guided deployment flow: **Source → Configure → Review → Deploy**. Pick from a curated chart catalog (Whisper STT, Triton, Ray, JupyterHub) or bring your own via OCI registry, Git URL, or file upload. Each Kubernetes resource is individually configurable through structured forms — no YAML required.
 
 ### Canvas — Visual Workflow & Topology
 
-Every deployed Helm release renders as a connected node graph on Canvas. Each K8s resource (ServingRuntime, InferenceService, PVC, RBAC, Job) is a draggable node showing its configuration. Connections show resource dependencies. Supports:
+Every deployed Helm release renders as a connected node graph on Canvas. Each K8s resource (ServingRuntime, InferenceService, PVC, RBAC, Job) is a draggable node showing its configuration. Connections show resource dependencies.
+
+![Canvas Workflow](docs/screenshots/06-canvas-workflow.png)
 
 - Drag-and-drop node creation from a collapsible panel
 - Multi-tab workflows per project
 - Undo/redo, copy/paste, keyboard shortcuts
 - Export to JSON and Helm chart
-- Simulated execution with per-node deployment logs
 - Grid toggle, minimap, fit-to-view
+
+### Workflow Execution & Deployment Logs
+
+Click **Execute** to run workflows with real-time node animations and a terminal-style log dialog showing per-node progress, timestamps, and phase tracking. Logs can be copied or downloaded.
+
+![Execution with Log Dialog](docs/screenshots/08-execution-log-dialog.png)
+
+- Level-by-level topological execution with animated particle trails
+- Helm deployment with 6-phase lifecycle (Validate → Infrastructure → Services → Jobs → Health Checks → Ready)
+- Persistent log dialog with copy/download — stays visible until dismissed
+- "Deploy Now" from Quickstarts auto-triggers execution on canvas load
+
+### BYOH (Bring Your Own Helm) Wizard
+
+A 4-step guided deployment flow: **Source → Configure → Review → Deploy**. Pick from a curated chart catalog (Whisper STT, Triton, Ray, JupyterHub) or bring your own via OCI registry, Git URL, or file upload. Each Kubernetes resource is individually configurable through structured forms — no YAML required.
+
+### Quickstart Templates
+
+Pre-built workflow templates for common AI/ML patterns. Select a template, configure, and deploy directly to Canvas with one click.
+
+![Quickstarts](docs/screenshots/05-quickstarts.png)
 
 ### Community Plugin Marketplace
 
 6 community plugins, each with one-click deploy/undeploy, a dedicated workspace, and custom Canvas nodes:
+
+![Community Plugins](docs/screenshots/04-community-plugins.png)
 
 | Plugin | Category | Description |
 |--------|----------|-------------|
@@ -34,9 +56,11 @@ Every deployed Helm release renders as a connected node graph on Canvas. Each K8
 
 Plugins open as workflow tabs under a shared, configurable Canvas project.
 
-### Dashboard
+### Dashboard & Onboarding
 
-Getting-started checklist, guided tour, and what's-new banner for onboarding. Quickstart wizard for loading workflow templates.
+Getting-started checklist, guided tour, and what's-new banner for onboarding.
+
+![Dashboard with Sidebar](docs/screenshots/02-dashboard-sidebar.png)
 
 ## Architecture
 
@@ -98,6 +122,9 @@ npm run lint
 # Format
 npm run format
 
+# Capture README screenshots (requires dev server running)
+node scripts/capture-screenshots.mjs
+
 # Analyze bundle size
 npm run bundle-profile:analyze
 
@@ -113,6 +140,7 @@ npm run start
 - **Routing:** React Router v6
 - **State:** React hooks + localStorage persistence
 - **Testing:** Jest + React Testing Library
+- **Screenshots:** Playwright (dev only)
 - **Linting:** ESLint + Prettier
 
 ## Data Flow
