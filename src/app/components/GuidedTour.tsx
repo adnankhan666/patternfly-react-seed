@@ -1,21 +1,23 @@
 import * as React from 'react';
 import {
-  Popover,
   Button,
   Flex,
   FlexItem,
-  Content,
   Title,
   Label,
 } from '@patternfly/react-core';
-
+import { useSidebar } from '../contexts/SidebarContext';
+import './GuidedTour.css';
 
 interface TourStep {
   target: string;
   title: string;
   content: string;
-  placement?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
+  placement?: 'right' | 'left' | 'bottom' | 'top';
 }
+
+const TOUR_VERSION = 'v12';
+const TOUR_STORAGE_KEY = `tourCompleted-${TOUR_VERSION}`;
 
 const TOUR_STEPS: TourStep[] = [
   {
@@ -39,7 +41,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     target: '[id="communityPlugins"]',
     title: 'Community Plugins',
-    content: 'Browse 6 community plugins, install them, open dedicated workspaces, and deploy Helm charts with BYOH.',
+    content: 'Browse plugins, launch Quickstarts, and explore Developer Preview. Deployed plugins appear here too.',
     placement: 'right',
   },
   {
@@ -50,31 +52,118 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
+interface TourPosition {
+  top: number;
+  left: number;
+  placement: TourStep['placement'];
+}
+
+const NAV_GROUPS_TO_EXPAND: Record<string, string[]> = {
+  '[id="canvas"]': ['canvas'],
+  '[id="communityPlugins"]': ['communityPlugins'],
+  '[id="settings"]': ['settings'],
+};
+
+const ensureNavGroupsExpanded = (groupIds: string[]) => {
+  groupIds.forEach((groupId) => {
+    const group = document.getElementById(groupId);
+    const toggle = group?.querySelector('button[aria-expanded="false"]') as HTMLButtonElement | null;
+    toggle?.click();
+  });
+};
+
+const getTourPosition = (rect: DOMRect, placement: TourStep['placement'] = 'right'): TourPosition => {
+  const cardWidth = 320;
+  const cardHeight = 200;
+  const gap = 16;
+
+  switch (placement) {
+    case 'left':
+      return {
+        top: Math.max(16, rect.top + rect.height / 2 - cardHeight / 2),
+        left: Math.max(16, rect.left - cardWidth - gap),
+        placement,
+      };
+    case 'bottom':
+      return {
+        top: rect.bottom + gap,
+        left: Math.max(16, rect.left + rect.width / 2 - cardWidth / 2),
+        placement,
+      };
+    case 'top':
+      return {
+        top: Math.max(16, rect.top - cardHeight - gap),
+        left: Math.max(16, rect.left + rect.width / 2 - cardWidth / 2),
+        placement,
+      };
+    case 'right':
+    default:
+      return {
+        top: Math.max(16, rect.top + rect.height / 2 - cardHeight / 2),
+        left: Math.min(window.innerWidth - cardWidth - 16, rect.right + gap),
+        placement: 'right',
+      };
+  }
+};
+
 const GuidedTour: React.FunctionComponent = () => {
+  const { sidebarOpen, setSidebarOpen } = useSidebar();
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isActive, setIsActive] = React.useState(false);
-  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [targetRect, setTargetRect] = React.useState<DOMRect | null>(null);
 
   const startTour = React.useCallback(() => {
     setCurrentStep(0);
     setIsActive(true);
-  }, []);
+    setSidebarOpen(true);
+    sessionStorage.setItem('tourInProgress', 'true');
+  }, [setSidebarOpen]);
 
   React.useEffect(() => {
-    const hasSeenTour = localStorage.getItem('tourCompleted');
+    const hasSeenTour = localStorage.getItem(TOUR_STORAGE_KEY);
     if (!hasSeenTour) {
-      const timer = setTimeout(startTour, 1500);
-      return () => clearTimeout(timer);
+      const timer = window.setTimeout(startTour, 1500);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [startTour]);
 
   React.useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) return undefined;
+
     const step = TOUR_STEPS[currentStep];
-    if (!step) return;
-    const el = document.querySelector(step.target) as HTMLElement;
-    setAnchorEl(el);
-  }, [currentStep, isActive]);
+    if (!step) return undefined;
+
+    const updateRect = () => {
+      const groupsToExpand = NAV_GROUPS_TO_EXPAND[step.target];
+      if (groupsToExpand) {
+        ensureNavGroupsExpanded(groupsToExpand);
+      }
+
+      const el = document.querySelector(step.target) as HTMLElement | null;
+      if (el) {
+        setTargetRect(el.getBoundingClientRect());
+      }
+    };
+
+    updateRect();
+    const interval = window.setInterval(updateRect, 250);
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [currentStep, isActive, sidebarOpen]);
+
+  const completeTour = () => {
+    setIsActive(false);
+    setTargetRect(null);
+    sessionStorage.removeItem('tourInProgress');
+    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+  };
 
   const handleNext = () => {
     if (currentStep < TOUR_STEPS.length - 1) {
@@ -90,75 +179,66 @@ const GuidedTour: React.FunctionComponent = () => {
     }
   };
 
-  const completeTour = () => {
-    setIsActive(false);
-    localStorage.setItem('tourCompleted', 'true');
-  };
-
-  if (!isActive || !anchorEl) return null;
+  if (!isActive || !targetRect) return null;
 
   const step = TOUR_STEPS[currentStep];
   const isLast = currentStep === TOUR_STEPS.length - 1;
+  const cardPosition = getTourPosition(targetRect, step.placement);
 
   return (
     <>
-      {/* Backdrop */}
+      <div className="guided-tour-backdrop" onClick={completeTour} />
       <div
+        className="guided-tour-highlight"
         style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.3)',
-          zIndex: 9990,
+          top: targetRect.top - 4,
+          left: targetRect.left - 4,
+          width: targetRect.width + 8,
+          height: targetRect.height + 8,
         }}
-        onClick={completeTour}
       />
-      <Popover
-        isVisible
-        shouldOpen={() => true}
-        shouldClose={() => false}
-        triggerRef={() => anchorEl}
-        position={step.placement || 'right'}
-        headerContent={
-          <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-            <FlexItem>
-              <Title headingLevel="h4" size="md">{step.title}</Title>
-            </FlexItem>
-            <FlexItem>
-              <Label isCompact>{currentStep + 1} / {TOUR_STEPS.length}</Label>
-            </FlexItem>
-          </Flex>
-        }
-        bodyContent={
-          <Content>
-            <p>{step.content}</p>
-          </Content>
-        }
-        footerContent={
-          <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} style={{ width: '100%' }}>
-            <FlexItem>
-              <Button variant="link" onClick={completeTour} size="sm">
-                Skip Tour
-              </Button>
-            </FlexItem>
-            <FlexItem>
-              <Flex gap={{ default: 'gapSm' }}>
-                {currentStep > 0 && (
-                  <FlexItem>
-                    <Button variant="secondary" onClick={handlePrev} size="sm">
-                      Previous
-                    </Button>
-                  </FlexItem>
-                )}
+      <div
+        className="guided-tour-card"
+        style={{
+          top: cardPosition.top,
+          left: cardPosition.left,
+        }}
+        role="dialog"
+        aria-labelledby="guided-tour-title"
+      >
+        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+          <FlexItem>
+            <Title headingLevel="h4" size="md" id="guided-tour-title">{step.title}</Title>
+          </FlexItem>
+          <FlexItem>
+            <Label isCompact>{currentStep + 1} / {TOUR_STEPS.length}</Label>
+          </FlexItem>
+        </Flex>
+        <p className="guided-tour-card__content">{step.content}</p>
+        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} style={{ marginTop: '16px' }}>
+          <FlexItem>
+            <Button variant="link" onClick={completeTour} size="sm">
+              Skip Tour
+            </Button>
+          </FlexItem>
+          <FlexItem>
+            <Flex gap={{ default: 'gapSm' }}>
+              {currentStep > 0 && (
                 <FlexItem>
-                  <Button variant="primary" onClick={handleNext} size="sm">
-                    {isLast ? 'Finish' : 'Next'}
+                  <Button variant="secondary" onClick={handlePrev} size="sm">
+                    Previous
                   </Button>
                 </FlexItem>
-              </Flex>
-            </FlexItem>
-          </Flex>
-        }
-      />
+              )}
+              <FlexItem>
+                <Button variant="primary" onClick={handleNext} size="sm">
+                  {isLast ? 'Finish' : 'Next'}
+                </Button>
+              </FlexItem>
+            </Flex>
+          </FlexItem>
+        </Flex>
+      </div>
     </>
   );
 };

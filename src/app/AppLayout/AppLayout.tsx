@@ -22,11 +22,12 @@ import {
   ToolbarItem,
 } from '@patternfly/react-core';
 import { BarsIcon } from '@patternfly/react-icons';
-import { useNavigationData, isNavDataGroup, NavDataHref, NavDataGroup } from '@app/navData';
+import { useNavigationData, isNavDataGroup, NavDataHref, NavDataGroup, NavDataItem } from '@app/navData';
 import { ChatBot } from '../ChatBot/ChatBot';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GuidedTour } from '../components/GuidedTour';
 import { useSidebar } from '../contexts/SidebarContext';
+import './AppLayout.css';
 
 interface IAppLayout {
   children: React.ReactNode;
@@ -105,10 +106,36 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
 
   const location = useLocation();
   const navigationData = useNavigationData();
+  const isInitialMount = React.useRef(true);
 
   React.useEffect(() => {
+    const tourInProgress = sessionStorage.getItem('tourInProgress') === 'true';
+    const hasSeenTour = localStorage.getItem('tourCompleted-v12') === 'true';
+
+    if (tourInProgress) {
+      setSidebarOpen(true);
+      return;
+    }
+
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (!hasSeenTour) {
+        setSidebarOpen(true);
+        return;
+      }
+    }
+
     setSidebarOpen(false);
   }, [location.pathname, setSidebarOpen]);
+
+  const isHrefInNavTree = React.useCallback((items: NavDataItem[], pathname: string): boolean => {
+    return items.some((item) => {
+      if (isNavDataGroup(item)) {
+        return isHrefInNavTree(item.children, pathname);
+      }
+      return item.href === pathname;
+    });
+  }, []);
 
   const renderNavItem = (item: NavDataHref) => (
     <NavItem key={item.id} id={item.id} isActive={item.href === location.pathname}>
@@ -116,11 +143,22 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     </NavItem>
   );
 
-  const renderNavGroup = (group: NavDataGroup) => {
-    const isActive = group.children.some((child) => child.href === location.pathname);
+  const renderNavGroup = (group: NavDataGroup, depth = 0): React.ReactNode => {
+    const isActive = isHrefInNavTree(group.children, location.pathname);
+    const shouldExpand = isActive || (group.id === 'communityPlugins' && location.pathname.startsWith('/plugins'));
+
     return (
-      <NavExpandable key={group.id} id={group.id} title={group.group.title} isActive={isActive}>
-        {group.children.map((child) => renderNavItem(child))}
+      <NavExpandable
+        key={group.id}
+        id={group.id}
+        title={group.group.title}
+        isActive={isActive}
+        isExpanded={shouldExpand}
+        className={depth > 0 ? 'nav-nested-group' : undefined}
+      >
+        {group.children.map((child) =>
+          isNavDataGroup(child) ? renderNavGroup(child, depth + 1) : renderNavItem(child)
+        )}
       </NavExpandable>
     );
   };

@@ -22,6 +22,7 @@ import {
   ThIcon,
   SearchPlusIcon,
   SearchMinusIcon,
+  CubeIcon,
 } from '@patternfly/react-icons';
 
 interface WorkflowToolbarProps {
@@ -45,6 +46,7 @@ interface WorkflowToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
+  onImportHelm?: () => void;
 }
 
 export const WorkflowToolbar: React.FunctionComponent<WorkflowToolbarProps> = React.memo(({
@@ -68,6 +70,7 @@ export const WorkflowToolbar: React.FunctionComponent<WorkflowToolbarProps> = Re
   onZoomIn,
   onZoomOut,
   onResetZoom,
+  onImportHelm,
 }) => {
   return (
     <Card isCompact>
@@ -122,6 +125,18 @@ export const WorkflowToolbar: React.FunctionComponent<WorkflowToolbarProps> = Re
                       Import
                     </Button>
                   </ToolbarItem>
+                  {onImportHelm && (
+                    <ToolbarItem>
+                      <Button
+                        variant="secondary"
+                        icon={<CubeIcon />}
+                        onClick={onImportHelm}
+                        aria-label="Import Helm chart to canvas"
+                      >
+                        Helm Chart
+                      </Button>
+                    </ToolbarItem>
+                  )}
                   <ToolbarItem>
                     <Button
                       variant="primary"

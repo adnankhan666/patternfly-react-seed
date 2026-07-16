@@ -1,0 +1,11 @@
+.nav-nested-group > .pf-v6-c-nav__subnav > .pf-v6-c-nav__list > .pf-v6-c-nav__item {
+  margin-left: 0.75rem;
+}
+
+.nav-nested-group .pf-v6-c-nav__link {
+  font-size: 0.9rem;
+}
+
+.nav-nested-group .pf-v6-c-nav__subnav .pf-v6-c-nav__link {
+  padding-left: 2rem;
+}

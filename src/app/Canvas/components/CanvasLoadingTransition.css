@@ -1,0 +1,77 @@
+.canvas-loading-transition {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(249, 250, 251, 0.98) 0%, rgba(243, 244, 246, 0.98) 100%);
+  animation: canvasLoadingFadeIn 0.35s ease;
+}
+
+.canvas-loading-transition__content {
+  text-align: center;
+  padding: 2rem;
+}
+
+.canvas-loading-transition__project {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.canvas-loading-transition__subtitle {
+  margin: 0;
+  max-width: 420px;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+@keyframes canvasLoadingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.canvas-project-shell {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  min-height: 100%;
+}
+
+.canvas-project-shell__canvas {
+  height: 100%;
+  width: 100%;
+}
+
+.canvas-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  transition: opacity 0.6s ease;
+}
+
+.canvas-loading-overlay--fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.canvas-project-shell--revealing {
+  animation: canvasReveal 0.5s ease forwards;
+}
+
+@keyframes canvasReveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,33 @@
+---
+description: Canvas grid and ExecutionOverlay positioning contracts — do not break
+globs: src/app/Canvas/**
+alwaysApply: false
+---
+
+# Canvas Grid & Overlay Contracts
+
+These invariants were established after repeated regressions (v8 → v12). They are non-negotiable.
+
+## Grid Contract
+
+- The canvas grid MUST be dynamic: `backgroundSize` and `backgroundPosition` on `.workflow-canvas` must be derived from `zoom` and `pan` state via inline styles.
+- `GRID_SIZE` from `constants.ts` is the single source of truth for grid spacing.
+- The CSS `background-image` defines the gradient pattern; JS inline styles control size and position.
+- When `gridEnabled` is false, the `no-grid` class hides the background — this is the only toggle mechanism.
+
+## ExecutionOverlay Positioning Contract
+
+- The overlay uses `position: fixed` with JS-computed `top` from a `ResizeObserver` on `.workflow-canvas`.
+- Horizontal position is CSS-owned (`right: 16px` for helm, `right: 24px` for standard).
+- Vertical position is JS-owned (`top` style prop from canvas observation).
+- Drag uses an additive `transform: translate(offsetX, offsetY)` on top of the CSS/JS base position.
+- `dragOffset` MUST reset to `{x:0, y:0}` when the overlay reopens (new deployment or "View Logs").
+- Only the title bar div is the drag handle — log content area stops propagation for text selection.
+
+## What You Must NOT Do
+
+- Do not add `top`, `left`, or `right` inline styles that compete with the CSS anchor.
+- Do not replace the `ResizeObserver`-based `canvasTop` with a one-shot `getBoundingClientRect` call.
+- Do not make the entire overlay a drag handle — only the title bar.
+- Do not use `!important` on positioning properties without a comment explaining the conflict.
+- Do not change `backgroundSize`/`backgroundPosition` to static CSS values.

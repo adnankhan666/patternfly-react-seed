@@ -13,7 +13,7 @@ export interface NavDataGroup {
     id: string;
     title: string;
   };
-  children: NavDataHref[];
+  children: NavDataItem[];
 }
 
 export type NavDataItem = NavDataHref | NavDataGroup;
@@ -189,9 +189,24 @@ export const useNavigationData = (): NavDataItem[] => {
         },
         children: [
           {
-            id: 'plugins-browse',
-            label: 'All Plugins',
+            id: 'plugins-overview',
+            label: 'Overview',
             href: '/plugins',
+          },
+          {
+            id: 'plugins-quickstarts',
+            label: 'Quickstarts',
+            href: '/plugins/quickstarts',
+          },
+          {
+            id: 'plugins-developer-preview',
+            label: 'Developer Preview',
+            href: '/plugins/developer-preview',
+          },
+          {
+            id: 'plugins-technical-preview',
+            label: 'Technical Preview',
+            href: '/plugins/technical-preview',
           },
           ...deployedPlugins.map((plugin) => ({
             id: `plugin-${plugin.id}`,

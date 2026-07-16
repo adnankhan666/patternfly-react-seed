@@ -1,9 +1,12 @@
 import * as React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { PageSection } from '@patternfly/react-core';
 import { WorkflowCanvas } from './WorkflowCanvas';
+import { CanvasLoadingTransition } from './components/CanvasLoadingTransition';
 import { useSidebar } from '../contexts/SidebarContext';
 import { toCanvasProjectSlug } from '../../data/pluginRegistry';
+import { consumeCanvasLoadingTransition } from './utils/canvasLoadingTransition';
+import './components/CanvasLoadingTransition.css';
 
 const titleCaseSlug = (slug: string): string =>
   slug
@@ -25,12 +28,39 @@ const resolveProjectDisplayName = (slug: string): string => {
 
 const DynamicProject: React.FunctionComponent = () => {
   const { projectName } = useParams<{ projectName: string }>();
+  const [searchParams] = useSearchParams();
   const { setSidebarOpen } = useSidebar();
+  const autoExecute = searchParams.get('autoExecute') === 'true';
+  const [showLoading, setShowLoading] = React.useState(() =>
+    !autoExecute && (searchParams.get('deployed') === 'true' || consumeCanvasLoadingTransition())
+  );
+  const [canvasVisible, setCanvasVisible] = React.useState(autoExecute || !showLoading);
 
-  // Auto-hide sidebar when project is selected
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [setSidebarOpen]);
+
+  React.useEffect(() => {
+    if (autoExecute) {
+      setCanvasVisible(true);
+      setShowLoading(false);
+      return;
+    }
+
+    if (!showLoading) {
+      setCanvasVisible(true);
+      return;
+    }
+
+    setCanvasVisible(false);
+    const revealTimer = window.setTimeout(() => setCanvasVisible(true), 1600);
+    const hideTimer = window.setTimeout(() => setShowLoading(false), 2200);
+
+    return () => {
+      window.clearTimeout(revealTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [showLoading, projectName, autoExecute]);
 
   const slug = projectName ? decodeURIComponent(projectName) : '';
   const displayName = slug ? resolveProjectDisplayName(slug) : 'Project';
@@ -44,9 +74,21 @@ const DynamicProject: React.FunctionComponent = () => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
-      <WorkflowCanvas projectName={displayName} />
+      <div className="canvas-project-shell">
+        {canvasVisible && (
+          <div className={`canvas-project-shell__canvas ${showLoading ? '' : 'canvas-project-shell--revealing'}`}>
+            <WorkflowCanvas projectName={displayName} projectSlug={slug} autoExecute={autoExecute} />
+          </div>
+        )}
+        {showLoading && (
+          <div className={`canvas-loading-overlay ${canvasVisible ? 'canvas-loading-overlay--fading' : ''}`}>
+            <CanvasLoadingTransition projectName={displayName} />
+          </div>
+        )}
+      </div>
     </PageSection>
   );
 };

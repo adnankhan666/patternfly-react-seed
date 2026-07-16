@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@app/ErrorBoundary';
 import { Spinner } from '@patternfly/react-core';
 
@@ -16,11 +16,12 @@ const EnabledApplications = React.lazy(() => import('@app/Applications/EnabledAp
 const ExploreApplications = React.lazy(() => import('@app/Applications/ExploreApplications').then(m => ({ default: m.ExploreApplications })));
 const Canvas = React.lazy(() => import('@app/Canvas/Canvas').then(m => ({ default: m.Canvas })));
 const DynamicProject = React.lazy(() => import('@app/Canvas/DynamicProject').then(m => ({ default: m.DynamicProject })));
-const QuickstartWizard = React.lazy(() => import('@app/Canvas/components/QuickstartWizard').then(m => ({ default: m.QuickstartWizard })));
-const PluginBrowse = React.lazy(() => import('@app/CommunityPlugins/PluginBrowse').then(m => ({ default: m.PluginBrowse })));
 const PluginDetail = React.lazy(() => import('@app/CommunityPlugins/PluginDetail').then(m => ({ default: m.PluginDetail })));
 const PluginWorkspace = React.lazy(() => import('@app/CommunityPlugins/PluginWorkspace').then(m => ({ default: m.PluginWorkspace })));
-const BYOHWizard = React.lazy(() => import('@app/CommunityPlugins/BYOHWizard').then(m => ({ default: m.BYOHWizard })));
+const QuickstartsPage = React.lazy(() => import('@app/CommunityPlugins/QuickstartsPage').then(m => ({ default: m.QuickstartsPage })));
+const DeveloperPreviewPage = React.lazy(() => import('@app/CommunityPlugins/DeveloperPreviewPage').then(m => ({ default: m.DeveloperPreviewPage })));
+const TechnicalPreviewPage = React.lazy(() => import('@app/CommunityPlugins/TechnicalPreviewPage').then(m => ({ default: m.TechnicalPreviewPage })));
+const CommunityPluginsLanding = React.lazy(() => import('@app/CommunityPlugins/CommunityPluginsLanding').then(m => ({ default: m.CommunityPluginsLanding })));
 const Projects = React.lazy(() => import('@app/Projects/Projects').then(m => ({ default: m.Projects })));
 const Pipelines = React.lazy(() => import('@app/Pipelines/Pipelines').then(m => ({ default: m.Pipelines })));
 const PipelineRuns = React.lazy(() => import('@app/Pipelines/PipelineRuns').then(m => ({ default: m.PipelineRuns })));
@@ -96,19 +97,37 @@ const routes: AppRouteConfig[] = [
     title: 'ODH Dashboard | Project',
   },
   {
-    element: <QuickstartWizard />,
+    element: <Navigate to="/plugins/quickstarts" replace />,
     exact: true,
     path: '/quickstart',
     title: 'ODH Dashboard | Quickstart',
   },
   {
-    element: <PluginBrowse />,
+    element: <CommunityPluginsLanding />,
     exact: true,
     path: '/plugins',
     title: 'ODH Dashboard | Community Plugins',
   },
   {
-    element: <BYOHWizard />,
+    element: <QuickstartsPage />,
+    exact: true,
+    path: '/plugins/quickstarts',
+    title: 'ODH Dashboard | Quickstarts',
+  },
+  {
+    element: <DeveloperPreviewPage />,
+    exact: true,
+    path: '/plugins/developer-preview',
+    title: 'ODH Dashboard | Developer Preview',
+  },
+  {
+    element: <TechnicalPreviewPage />,
+    exact: true,
+    path: '/plugins/technical-preview',
+    title: 'ODH Dashboard | Technical Preview',
+  },
+  {
+    element: <Navigate to="/canvas" replace />,
     exact: true,
     path: '/plugins/lemonade/byoh',
     title: 'ODH Dashboard | BYOH Deploy',

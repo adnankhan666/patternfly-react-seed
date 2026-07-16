@@ -15,14 +15,14 @@ import {
 import {
   PlusCircleIcon,
   CubesIcon,
-  RocketIcon,
-  PluggedIcon,
+  UsersIcon,
   ArrowRightIcon,
   FolderOpenIcon,
 } from '@patternfly/react-icons';
 import { DropText } from './DropText';
 import { GettingStartedChecklist } from '../components/GettingStartedChecklist';
 import { WhatsNewBanner } from '../components/WhatsNewBanner';
+import { CommunityPopover } from '../components/CommunityPopover';
 import './Dashboard.css';
 
 const Dashboard: React.FunctionComponent = () => {
@@ -62,30 +62,19 @@ const Dashboard: React.FunctionComponent = () => {
       action: () => navigate('/canvas'),
     },
     {
-      title: 'Quickstart Templates',
-      description: 'Deploy a pre-built workflow in 1-2 clicks',
-      icon: <RocketIcon style={{ color: '#8b5cf6', fontSize: '1.5rem' }} />,
-      action: () => navigate('/quickstart'),
-    },
-    {
       title: 'Model Catalog',
       description: 'Browse and deploy AI/ML models',
       icon: <CubesIcon style={{ color: '#f59e0b', fontSize: '1.5rem' }} />,
       action: () => navigate('/modelCatalog'),
     },
     {
-      title: 'Community Plugins',
-      description: 'Explore community-built extensions',
-      icon: <PluggedIcon style={{ color: '#10b981', fontSize: '1.5rem' }} />,
-      action: () => navigate('/plugins'),
+      title: 'Community',
+      description: 'Quickstarts, plugins, and developer previews',
+      icon: <UsersIcon style={{ color: '#10b981', fontSize: '1.5rem' }} />,
+      action: () => navigate('/plugins/developer-preview'),
+      isCommunityTile: true,
     },
-    {
-      title: 'BYOH Deploy',
-      description: 'Deploy Helm charts to your cluster',
-      icon: <RocketIcon style={{ color: '#ec4899', fontSize: '1.5rem' }} />,
-      action: () => navigate('/plugins/lemonade/byoh'),
-    },
-  ];
+  ] as Array<{ title: string; description: string; icon: React.ReactNode; action?: () => void; isCommunityTile?: boolean }>;
 
   return (
     <>
@@ -127,7 +116,7 @@ const Dashboard: React.FunctionComponent = () => {
             Jump right in with one of these common actions
           </p>
         </Content>
-        <Gallery hasGutter minWidths={{ default: '240px' }}>
+        <Gallery hasGutter minWidths={{ default: '280px' }}>
           {quickStartItems.map((item, index) => (
             <GalleryItem key={index}>
               <Card isCompact isFullHeight>
@@ -151,15 +140,38 @@ const Dashboard: React.FunctionComponent = () => {
                       </p>
                     </FlexItem>
                     <FlexItem align={{ default: 'alignRight' }} style={{ marginTop: 'auto' }}>
-                      <Button
-                        variant="link"
-                        isInline
-                        icon={<ArrowRightIcon />}
-                        iconPosition="end"
-                        onClick={item.action}
-                      >
-                        Get started
-                      </Button>
+                      {item.isCommunityTile ? (
+                        <Flex gap={{ default: 'gapMd' }}>
+                          <FlexItem>
+                            <Button
+                              variant="link"
+                              isInline
+                              icon={<ArrowRightIcon />}
+                              iconPosition="end"
+                              onClick={item.action}
+                            >
+                              Explore
+                            </Button>
+                          </FlexItem>
+                          <FlexItem>
+                            <CommunityPopover>
+                              <Button variant="link" isInline>
+                                What&apos;s new
+                              </Button>
+                            </CommunityPopover>
+                          </FlexItem>
+                        </Flex>
+                      ) : (
+                        <Button
+                          variant="link"
+                          isInline
+                          icon={<ArrowRightIcon />}
+                          iconPosition="end"
+                          onClick={item.action}
+                        >
+                          Get started
+                        </Button>
+                      )}
                     </FlexItem>
                   </Flex>
                 </CardBody>

@@ -1,0 +1,41 @@
+---
+description: Prevent regressions — never rewrite working infrastructure during feature work
+alwaysApply: true
+---
+
+# Preserve Working Infrastructure
+
+When adding features to existing files, you MUST preserve prior architectural contracts.
+
+## Non-Negotiable Rules
+
+1. **Check history before rewriting.** Before modifying positioning, layout, coordinate systems, or event handling in any component, run `git log --oneline -- <file>` and read fix commit messages. If a pattern was established by a fix commit, treat it as load-bearing.
+
+2. **Extend, don't replace.** Add new props, callbacks, or CSS classes alongside existing ones. Never swap out a positioning model (e.g. JS-owned transform vs CSS-anchored) as a side-effect of adding a button or feature.
+
+3. **One source of truth for position.** If a component's position is owned by JS state (e.g. `transform: translate(x, y)`), CSS must not also try to position it (no competing `top`/`right`/`left`). If CSS owns it, JS must not override it with transforms. Document which approach is used.
+
+4. **Dynamic foundations under dynamic features.** If a visual element (grid, overlay, minimap) must track a dynamic value (zoom, pan, viewport size), its rendering must derive from that value — never use static CSS that ignores it.
+
+5. **Document why, not what.** When a CSS rule uses `!important`, or a positioning approach is chosen, add a comment explaining the conflict it resolves. These comments are load-bearing — do not delete them during refactors.
+
+## Examples
+
+```css
+/* ❌ BAD — static grid ignores zoom/pan, breaks when user zooms */
+.workflow-canvas {
+  background-size: 20px 20px;
+}
+
+/* ✅ GOOD — grid tracks zoom/pan via inline style */
+/* CSS sets the default; JS overrides via style prop when zoom/pan change */
+```
+
+```typescript
+// ❌ BAD — replacing JS-owned positioning with CSS-anchored as side-effect of adding a button
+// v8 fix: JS owns position via transform. v10: silently replaced with CSS right:16px + JS top
+// Result: positioning breaks again
+
+// ✅ GOOD — add the button, keep the positioning model intact
+// If you need to change the positioning model, do it in a dedicated commit with clear rationale
+```

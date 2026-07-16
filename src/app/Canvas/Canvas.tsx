@@ -20,7 +20,7 @@ import {
   FlexItem,
   Content,
 } from '@patternfly/react-core';
-import { PlusCircleIcon, TrashIcon, FolderOpenIcon, RocketIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon, TrashIcon, FolderOpenIcon, RocketIcon, CubeIcon } from '@patternfly/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { getBYOHDeployments, BYOHDeploymentRecord } from '../../data/byohChartCatalog';
 
@@ -101,7 +101,7 @@ const Canvas: React.FunctionComponent = () => {
               <Button variant="primary" icon={<PlusCircleIcon />} onClick={handleModalToggle}>
                 Create Project
               </Button>
-              <Button variant="link" icon={<RocketIcon />} onClick={() => navigate('/quickstart')}>
+              <Button variant="link" icon={<RocketIcon />} onClick={() => navigate('/plugins/quickstarts')}>
                 Quickstart Template
               </Button>
             </EmptyStateActions>
@@ -126,8 +126,13 @@ const Canvas: React.FunctionComponent = () => {
                       </Button>
                     </FlexItem>
                     <FlexItem>
-                      <Button variant="secondary" icon={<RocketIcon />} onClick={() => navigate('/quickstart')}>
+                      <Button variant="secondary" icon={<RocketIcon />} onClick={() => navigate('/plugins/quickstarts')}>
                         Quickstart
+                      </Button>
+                    </FlexItem>
+                    <FlexItem>
+                      <Button variant="secondary" icon={<CubeIcon />} onClick={() => navigate('/plugins/quickstarts')}>
+                        Helm Chart
                       </Button>
                     </FlexItem>
                   </Flex>

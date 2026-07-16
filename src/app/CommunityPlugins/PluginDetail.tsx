@@ -31,13 +31,13 @@ import {
   Spinner,
 } from '@patternfly/react-core';
 import {
-  ArrowLeftIcon,
   DownloadIcon,
   TrashIcon,
   CheckCircleIcon,
   ExternalLinkAltIcon,
 } from '@patternfly/react-icons';
 import { getPluginById, PLUGIN_CATEGORIES, getPluginWorkspacePath, getDeployedPluginIds, setDeployedPluginIds } from '../../data/pluginRegistry';
+import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
 
 type WizardStep = 'configure' | 'deploying' | 'done';
 
@@ -115,7 +115,7 @@ const PluginDetail: React.FunctionComponent = () => {
           <Title headingLevel="h1" size="lg">Plugin Not Found</Title>
           <EmptyStateBody>The plugin you&apos;re looking for doesn&apos;t exist.</EmptyStateBody>
           <EmptyStateActions>
-            <Button variant="primary" onClick={() => navigate('/plugins')}>Browse Plugins</Button>
+            <Button variant="primary" onClick={() => navigate('/plugins')}>Community Plugins</Button>
           </EmptyStateActions>
         </EmptyState>
       </PageSection>
@@ -135,12 +135,15 @@ const PluginDetail: React.FunctionComponent = () => {
 
   return (
     <>
-      <PageSection hasBodyWrapper={false}>
-        <Flex direction={{ default: 'column' }} gap={{ default: 'gapLg' }} style={{ maxWidth: '900px' }}>
+      <PageSection hasBodyWrapper={false} style={{ paddingTop: '16px', paddingBottom: '16px' }}>
+        <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ maxWidth: '960px' }}>
           <FlexItem>
-            <Button variant="link" icon={<ArrowLeftIcon />} onClick={() => navigate('/plugins')}>
-              All Plugins
-            </Button>
+            <CommunityPluginsBreadcrumb
+              items={[
+                { label: 'Developer Preview', to: '/plugins/developer-preview?tab=plugins' },
+                { label: plugin.name },
+              ]}
+            />
           </FlexItem>
 
           <FlexItem>

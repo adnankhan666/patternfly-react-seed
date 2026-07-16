@@ -38,7 +38,6 @@ import {
   ModalHeader,
 } from '@patternfly/react-core';
 import {
-  ArrowLeftIcon,
   PlayIcon,
   DownloadIcon,
   SyncIcon,
@@ -55,6 +54,7 @@ import {
   Plugin,
 } from '../../data/pluginRegistry';
 import { appendPluginWorkflowToProject } from './pluginCanvasIntegration';
+import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
 import './PluginWorkspace.css';
 
 interface WorkspaceTableProps {
@@ -198,22 +198,22 @@ const LemonadeWorkspace: React.FunctionComponent = () => {
       </FlexItem>
       <FlexItem>
         <Card style={{ borderTop: '3px solid #ec4899' }}>
-          <CardHeader><CardTitle>BYOH — Bring Your Own Helm</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Helm Chart Deploy</CardTitle></CardHeader>
           <CardBody>
             <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
               <FlexItem>
                 <p style={{ color: '#6b7280', margin: 0 }}>
-                  Deploy Helm charts to your cluster in minutes. Choose from our recommended catalog
-                  or bring your own chart via URI or file upload.
+                  Deploy Helm charts to your cluster in minutes. Import charts directly into
+                  the Canvas from our catalog, a URI, or a file upload.
                 </p>
               </FlexItem>
               <FlexItem>
                 <Button
                   variant="primary"
                   icon={<RocketIcon />}
-                  onClick={() => navigate('/plugins/lemonade/byoh')}
+                  onClick={() => navigate('/canvas')}
                 >
-                  Launch BYOH Wizard
+                  Open Canvas
                 </Button>
               </FlexItem>
             </Flex>
@@ -636,7 +636,7 @@ const PluginWorkspace: React.FunctionComponent = () => {
           <Title headingLevel="h1" size="lg">Plugin Not Found</Title>
           <EmptyStateBody>The plugin workspace you&apos;re looking for doesn&apos;t exist.</EmptyStateBody>
           <EmptyStateActions>
-            <Button variant="primary" onClick={() => navigate('/plugins')}>Browse Plugins</Button>
+            <Button variant="primary" onClick={() => navigate('/plugins')}>Community Plugins</Button>
           </EmptyStateActions>
         </EmptyState>
       </PageSection>
@@ -655,7 +655,7 @@ const PluginWorkspace: React.FunctionComponent = () => {
             <Button variant="primary" onClick={() => navigate(`/plugins/${plugin.id}`)}>
               Deploy {plugin.name}
             </Button>
-            <Button variant="link" onClick={() => navigate('/plugins')}>Browse Plugins</Button>
+            <Button variant="link" onClick={() => navigate('/plugins')}>Community Plugins</Button>
           </EmptyStateActions>
         </EmptyState>
       </PageSection>
@@ -677,12 +677,16 @@ const PluginWorkspace: React.FunctionComponent = () => {
 
   return (
     <>
-      <PageSection hasBodyWrapper={false}>
-      <Flex direction={{ default: 'column' }} gap={{ default: 'gapLg' }} style={{ maxWidth: '1100px' }}>
+      <PageSection hasBodyWrapper={false} style={{ paddingTop: '16px', paddingBottom: '16px' }}>
+      <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ maxWidth: '1100px' }}>
         <FlexItem>
-          <Button variant="link" icon={<ArrowLeftIcon />} onClick={() => navigate(`/plugins/${plugin.id}`)}>
-            Back to {plugin.name}
-          </Button>
+          <CommunityPluginsBreadcrumb
+            items={[
+              { label: 'Developer Preview', to: '/plugins/developer-preview?tab=plugins' },
+              { label: plugin.name, to: `/plugins/${plugin.id}` },
+              { label: 'Workspace' },
+            ]}
+          />
         </FlexItem>
         <FlexItem>
           <WorkspaceHeader

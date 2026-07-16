@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { LoadingSpinner } from './LoadingSpinner';
 import { DeploymentStatus, DeploymentLog, PHASE_DESCRIPTIONS } from '../types/deploymentPhases';
 import './LoadingSpinner.css';
 
@@ -300,7 +299,22 @@ export const ExecutionOverlay: React.FunctionComponent<ExecutionOverlayProps> = 
       }}
     >
       <div className="execution-info">
-        <div className="execution-title" id="execution-title">Workflow Execution</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="execution-title" id="execution-title" style={{ marginBottom: 0 }}>Workflow Execution</div>
+          {onClose && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
+              style={{
+                background: 'transparent', border: 'none', color: '#9ca3af',
+                cursor: 'pointer', fontSize: '16px', padding: '2px 6px',
+                borderRadius: '4px', lineHeight: 1,
+              }}
+              title="Close"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <div className="execution-status" id="execution-status" role="status" aria-live="polite">
           {statusMessage}
         </div>

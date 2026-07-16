@@ -104,6 +104,7 @@ import './WorkflowCanvas.css';
 
 interface WorkflowCanvasProps {
   projectName: string;
+  autoExecute?: boolean;
 }
 
 interface AlertInfo {
@@ -118,7 +119,7 @@ interface WorkflowState {
 }
 
 
-export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ projectName }) => {
+export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ projectName, autoExecute }) => {
   const navigate = useNavigate();
   const [nodes, setNodes] = React.useState<NodeData[]>([]);
   const [connections, setConnections] = React.useState<Connection[]>([]);
@@ -1435,23 +1436,15 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       setIsExecuting(false);
-      
-      // Save deployment status for later viewing
+
+      // Save deployment status for later viewing via "View Logs" menu item
       setDeploymentStatus(prev => {
         if (prev) {
-          console.log('Saving deployment status:', prev);
           setSavedDeploymentStatus(prev);
-        } else {
-          console.log('No deployment status to save');
         }
         return prev;
       });
-      
-      // Add small delay to ensure state is saved
-      setTimeout(() => {
-        console.log('savedDeploymentStatus after save:', savedDeploymentStatus);
-      }, 100);
-      
+
       addAlert('Deployment completed successfully! Click "View Logs" to review.', AlertVariant.success);
       startOngoingFlow();
       return;
@@ -1461,16 +1454,39 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
     addAlert('Workflow execution started!', AlertVariant.info);
 
     const totalNodes = nodes.length;
+    const totalLevels = executionOrder.length;
+
+    // Initialize deployment status so the log dialog renders
+    const execStatus: DeploymentStatus = {
+      phase: 1,
+      totalPhases: totalLevels,
+      currentPhaseProgress: 0,
+      logs: [],
+      nodeStatuses: new Map(),
+    };
+    setDeploymentStatus(execStatus);
+    addDeploymentLog(1, '🚀 Starting workflow execution...', 'info');
 
     // Execute nodes level by level
-    for (let levelIndex = 0; levelIndex < executionOrder.length; levelIndex++) {
+    for (let levelIndex = 0; levelIndex < totalLevels; levelIndex++) {
       const level = executionOrder[levelIndex];
+      const phaseNum = levelIndex + 1;
+
+      setDeploymentStatus(prev => prev ? { ...prev, phase: phaseNum } : null);
 
       // Update status message
-      setExecutionStatus(`Executing level ${levelIndex + 1} of ${executionOrder.length}...`);
+      setExecutionStatus(`Executing level ${phaseNum} of ${totalLevels}...`);
+      addDeploymentLog(phaseNum, `⚙️ Executing level ${phaseNum} of ${totalLevels}...`, 'info');
 
       // Mark all nodes in this level as executing
       setExecutingNodes(new Set(level));
+
+      for (const nodeId of level) {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+          addDeploymentLog(phaseNum, `Running: ${node.label}`, 'info', nodeId, node.label);
+        }
+      }
 
       // Simulate node execution (1.5 seconds per level)
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -1480,12 +1496,18 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
         const newCompleted = new Set(prev);
         level.forEach(nodeId => newCompleted.add(nodeId));
 
-        // Update progress based on completed nodes
         const progress = Math.round((newCompleted.size / totalNodes) * 100);
         setExecutionProgress(progress);
 
         return newCompleted;
       });
+
+      for (const nodeId of level) {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+          addDeploymentLog(phaseNum, `✅ ${node.label} completed`, 'success', nodeId, node.label);
+        }
+      }
 
       setExecutingNodes(new Set());
 
@@ -1496,7 +1518,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       if (activeConns.length > 0) {
         setActiveConnections(new Set(activeConns.map(c => c.id)));
 
-        // Create particles for each connection
         const newParticles = activeConns.map((conn, idx) => ({
           id: `particle-${conn.id}-${Date.now()}-${idx}`,
           connectionId: conn.id,
@@ -1505,8 +1526,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
 
         setParticles(newParticles);
 
-        // Animate particles
-        const animationDuration = 1000; // 1 second
+        const animationDuration = 1000;
         const frameRate = 60;
         const totalFrames = (animationDuration / 1000) * frameRate;
 
@@ -1521,23 +1541,35 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       }
 
       // Small delay between levels
-      if (levelIndex < executionOrder.length - 1) {
+      if (levelIndex < totalLevels - 1) {
         await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
 
-    setIsExecuting(false);
+    addDeploymentLog(totalLevels, `✅ Workflow execution completed! All ${totalNodes} nodes finished.`, 'success');
+    setDeploymentStatus(prev => prev ? { ...prev, phase: totalLevels } : null);
+    setExecutionStatus('Workflow execution completed!');
     addAlert('Workflow execution completed!', AlertVariant.success);
 
-    // Reset completed state after a delay
-    setTimeout(() => {
-      setCompletedNodes(new Set());
-    }, 2000);
+    // Save for "View Logs" menu
+    setDeploymentStatus(prev => {
+      if (prev) setSavedDeploymentStatus(prev);
+      return prev;
+    });
 
     // Start ongoing flow animation
     startOngoingFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length, isExecuting, executionOrder, connections, addAlert, helmGlobalValues.namespace, addDeploymentLog, updateNodeStatus]);
+
+  // Auto-execute when navigated with ?autoExecute=true (e.g. "Deploy Now")
+  const autoExecuteTriggered = React.useRef(false);
+  React.useEffect(() => {
+    if (autoExecute && !autoExecuteTriggered.current && !isLoading && nodes.length > 0 && !isExecuting) {
+      autoExecuteTriggered.current = true;
+      handleExecute();
+    }
+  }, [autoExecute, isLoading, nodes.length, isExecuting, handleExecute]);
 
   // Ref to track if ongoing animation should continue
   const ongoingFlowRef = React.useRef<boolean>(false);
@@ -1840,7 +1872,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
   return (
     <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsNone' }} style={{ height: '100%' }}>
       {/* Header with Toolbar */}
-      <FlexItem>
+      <FlexItem style={{ flexShrink: 0 }}>
         <Card isCompact>
           <CardBody style={{ padding: '12px 16px' }}>
             <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -1997,7 +2029,7 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
       </FlexItem>
 
       {/* Workflow Tabs */}
-      <FlexItem>
+      <FlexItem style={{ flexShrink: 0 }}>
         <Card isCompact>
           <CardBody style={{ padding: '8px 16px' }}>
             <Tabs
@@ -2836,21 +2868,6 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
                   )}
                   </div>
 
-                  {/* Execution Progress Dialog - Fixed to top-right corner, outside transformed content */}
-                  {(isExecuting || deploymentStatus) && (
-                    <ExecutionOverlay
-                      progress={executionProgress}
-                      executingCount={executingNodes.size}
-                      completedCount={completedNodes.size}
-                      totalNodes={nodes.length}
-                      statusMessage={executionStatus}
-                      deploymentStatus={deploymentStatus}
-                      onClose={() => {
-                        setDeploymentStatus(null);
-                      }}
-                    />
-                  )}
-
                   {/* Workflow Minimap */}
                   {isMinimapOpen && nodes.length > 0 && (
                     <WorkflowMinimap
@@ -2869,6 +2886,24 @@ export const WorkflowCanvas: React.FunctionComponent<WorkflowCanvasProps> = ({ p
           </DrawerContent>
         </Drawer>
       </FlexItem>
+
+      {/* Execution Progress Dialog - rendered outside canvas/drawer so it's always on top */}
+      {(isExecuting || deploymentStatus) && (
+        <ExecutionOverlay
+          progress={executionProgress}
+          executingCount={executingNodes.size}
+          completedCount={completedNodes.size}
+          totalNodes={nodes.length}
+          statusMessage={executionStatus}
+          deploymentStatus={deploymentStatus}
+          onClose={() => {
+            setDeploymentStatus(null);
+            setIsExecuting(false);
+            setCompletedNodes(new Set());
+            setExecutingNodes(new Set());
+          }}
+        />
+      )}
 
       {/* Toast Notifications */}
       <AlertGroup isToast isLiveRegion style={{ position: 'fixed', top: '145px', right: '20px', zIndex: 9999, maxWidth: '400px', opacity: 0.75 }}>

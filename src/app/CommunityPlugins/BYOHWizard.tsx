@@ -460,7 +460,7 @@ const BYOHWizard: React.FunctionComponent = () => {
         <FlexItem>
           <Breadcrumb>
             <BreadcrumbItem>
-              <Link to="/plugins">Plugins</Link>
+              <Link to="/plugins/developer-preview">Plugins</Link>
             </BreadcrumbItem>
             <BreadcrumbItem>
               <Link to="/plugins/lemonade">Lemonade</Link>

@@ -7,17 +7,11 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 import '@app/app.css';
 
-// v11 clean slate: wipe all canvas projects and their workflow data
-if (!localStorage.getItem('v11_clean')) {
-  const oldProjects: string[] = JSON.parse(localStorage.getItem('canvasProjects') || '[]');
-  oldProjects.forEach((p) => {
-    const slug = p.toLowerCase().replace(/\s+/g, '-');
-    localStorage.removeItem(`workflow-${slug}`);
-  });
-  localStorage.removeItem('canvasProjects');
-  localStorage.removeItem('v11_migrated');
-  localStorage.removeItem('nodePanelOpen');
-  localStorage.setItem('v11_clean', 'true');
+// Clear all app localStorage on load during development
+const RESET_BUILD = '20260716-1217';
+if (localStorage.getItem('_resetBuild') !== RESET_BUILD) {
+  localStorage.clear();
+  localStorage.setItem('_resetBuild', RESET_BUILD);
 }
 
 const App: React.FunctionComponent = () => (

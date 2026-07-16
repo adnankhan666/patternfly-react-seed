@@ -37,7 +37,7 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'load-template',
     label: 'Load a workflow template',
-    route: '/quickstart',
+    route: '/plugins/quickstarts',
     check: () => {
       const keys = Object.keys(localStorage);
       return keys.some((k) => {
@@ -52,7 +52,7 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'explore-plugins',
     label: 'Browse Community Plugins',
-    route: '/plugins',
+    route: '/plugins/developer-preview?tab=plugins',
     check: () => getDeployedPluginIds().length > 0,
   },
   {
