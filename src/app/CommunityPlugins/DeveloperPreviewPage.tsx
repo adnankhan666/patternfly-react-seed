@@ -150,7 +150,7 @@ const DeveloperPreviewPage: React.FunctionComponent = () => {
                         </Content>
                       </FlexItem>
                       <FlexItem>
-                        <Gallery hasGutter minWidths={{ default: '260px' }} maxWidths={{ default: '1fr' }}>
+                        <Gallery hasGutter minWidths={{ default: '260px' }} maxWidths={{ default: '1fr' }} style={{ padding: '3px' }}>
                           {PREVIEW_FEATURES.map((feature) => {
                             // interestVersion re-reads localStorage after votes
                             const count = interestVersion >= 0

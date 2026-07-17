@@ -131,7 +131,7 @@ const PluginBrowseSection: React.FunctionComponent<PluginBrowseSectionProps> = (
             </p>
           </Content>
         ) : (
-          <Gallery hasGutter minWidths={{ default: '240px' }} maxWidths={{ default: '1fr' }}>
+          <Gallery hasGutter minWidths={{ default: '240px' }} maxWidths={{ default: '1fr' }} style={{ padding: '3px' }}>
             {filtered.map((plugin) => {
               const isDeployed = deployedPlugins.has(plugin.id);
               const color = categoryColors[plugin.category] || '#6b7280';

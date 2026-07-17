@@ -86,7 +86,7 @@ const EarlyAccessDeployed: React.FunctionComponent = () => {
               </EmptyStateFooter>
             </EmptyState>
           ) : (
-            <Gallery hasGutter minWidths={{ default: '300px' }} maxWidths={{ default: '1fr' }}>
+            <Gallery hasGutter minWidths={{ default: '300px' }} maxWidths={{ default: '1fr' }} style={{ padding: '3px' }}>
               {activeDeployments.map((deployment) => {
                 const feature = getEarlyAccessFeatureById(deployment.featureId);
                 if (!feature) return null;

@@ -113,7 +113,7 @@ const EarlyAccessOverview: React.FunctionComponent = () => {
   };
 
   const renderGallery = (features: typeof EARLY_ACCESS_FEATURES) => (
-    <Gallery hasGutter minWidths={{ default: '340px' }} maxWidths={{ default: '1fr' }}>
+    <Gallery hasGutter minWidths={{ default: '340px' }} maxWidths={{ default: '1fr' }} style={{ padding: '3px' }}>
       {features.map((feature) => {
         const count =
           interestVersion >= 0

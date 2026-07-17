@@ -145,7 +145,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
 
   const renderNavGroup = (group: NavDataGroup, depth = 0): React.ReactNode => {
     const isActive = isHrefInNavTree(group.children, location.pathname);
-    const shouldExpand = isActive || (group.id === 'communityPlugins' && location.pathname.startsWith('/plugins'));
+    const shouldExpand =
+      isActive ||
+      (group.id === 'communityPlugins' && location.pathname.startsWith('/plugins')) ||
+      (group.id === 'plugins-deployed-group' && location.pathname.startsWith('/plugins/')) ||
+      (group.id === 'earlyAccess' && location.pathname.startsWith('/early-access')) ||
+      (group.id === 'early-access-deployed-group' && location.pathname.startsWith('/early-access/deployed'));
 
     return (
       <NavExpandable

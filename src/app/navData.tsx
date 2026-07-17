@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { getDeployedPlugins, PLUGIN_DEPLOYED_EVENT } from '../data/pluginRegistry';
+import { getDeployedFeatures, FEATURE_EXPERIENCED_EVENT } from '../data/featureExperienceStore';
+import { getEarlyAccessFeatureById } from '../data/previewFeatures';
 
 export interface NavDataHref {
   id: string;
@@ -21,10 +23,33 @@ export type NavDataItem = NavDataHref | NavDataGroup;
 export const isNavDataGroup = (navDataItem: NavDataItem): navDataItem is NavDataGroup =>
   (navDataItem as NavDataGroup).group !== undefined;
 
+/** Demo surprise: Early Access is hidden until unlocked via Dashboard Easter egg */
+export const EARLY_ACCESS_UNLOCKED_KEY = 'earlyAccessUnlocked';
+export const EARLY_ACCESS_UNLOCKED_EVENT = 'earlyAccessUnlocked';
+
+export function isEarlyAccessUnlocked(): boolean {
+  try {
+    return localStorage.getItem(EARLY_ACCESS_UNLOCKED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function unlockEarlyAccess(): void {
+  localStorage.setItem(EARLY_ACCESS_UNLOCKED_KEY, 'true');
+  window.dispatchEvent(new CustomEvent(EARLY_ACCESS_UNLOCKED_EVENT));
+}
+
+export function lockEarlyAccess(): void {
+  localStorage.removeItem(EARLY_ACCESS_UNLOCKED_KEY);
+  window.dispatchEvent(new CustomEvent(EARLY_ACCESS_UNLOCKED_EVENT));
+}
+
 // Navigation data based on ODH Dashboard structure
 export const useNavigationData = (): NavDataItem[] => {
   const [dynamicProjects, setDynamicProjects] = React.useState<string[]>([]);
   const [deployedPluginsVersion, setDeployedPluginsVersion] = React.useState(0);
+  const [earlyAccessVersion, setEarlyAccessVersion] = React.useState(0);
 
   React.useEffect(() => {
     // Load projects from localStorage
@@ -60,9 +85,73 @@ export const useNavigationData = (): NavDataItem[] => {
     };
   }, []);
 
+  React.useEffect(() => {
+    const refreshEarlyAccess = () => setEarlyAccessVersion((v) => v + 1);
+    window.addEventListener(EARLY_ACCESS_UNLOCKED_EVENT, refreshEarlyAccess);
+    window.addEventListener(FEATURE_EXPERIENCED_EVENT, refreshEarlyAccess);
+    window.addEventListener('storage', refreshEarlyAccess);
+    return () => {
+      window.removeEventListener(EARLY_ACCESS_UNLOCKED_EVENT, refreshEarlyAccess);
+      window.removeEventListener(FEATURE_EXPERIENCED_EVENT, refreshEarlyAccess);
+      window.removeEventListener('storage', refreshEarlyAccess);
+    };
+  }, []);
+
   return React.useMemo(() => {
     void deployedPluginsVersion;
+    void earlyAccessVersion;
     const deployedPlugins = getDeployedPlugins();
+    const earlyAccessUnlocked = isEarlyAccessUnlocked();
+
+    const deployedFeatures = getDeployedFeatures().filter((d) => d.status !== 'stopped');
+
+    const earlyAccessGroup: NavDataItem = {
+      id: 'earlyAccess',
+      group: {
+        id: 'earlyAccess',
+        title: 'Early Access',
+      },
+      children: [
+        {
+          id: 'early-access-overview',
+          label: 'Overview',
+          href: '/early-access',
+        },
+        ...(deployedFeatures.length > 0
+          ? [
+              {
+                id: 'early-access-deployed-group',
+                group: {
+                  id: 'early-access-deployed-group',
+                  title: 'Deployed',
+                },
+                children: [
+                  {
+                    id: 'early-access-deployed',
+                    label: 'All Deployed',
+                    href: '/early-access/deployed',
+                  },
+                  ...deployedFeatures.map((d) => {
+                    const feature = getEarlyAccessFeatureById(d.featureId);
+                    return {
+                      id: `ea-deployed-${d.featureId}`,
+                      label: feature?.name ?? d.featureId,
+                      href: `/early-access/deployed/${d.featureId}`,
+                    };
+                  }),
+                ],
+              } as NavDataItem,
+            ]
+          : [
+              {
+                id: 'early-access-deployed',
+                label: 'Deployed',
+                href: '/early-access/deployed',
+              },
+            ]),
+      ],
+    };
+
     const navData: NavDataItem[] = [
       // Home
       {
@@ -180,26 +269,8 @@ export const useNavigationData = (): NavDataItem[] => {
         label: 'Telemetry',
         href: '/telemetry',
       },
-      // Early Access (Expandable Group) — DP/TP features; sandboxes are NOT nav items
-      {
-        id: 'earlyAccess',
-        group: {
-          id: 'earlyAccess',
-          title: 'Early Access',
-        },
-        children: [
-          {
-            id: 'early-access-overview',
-            label: 'Overview',
-            href: '/early-access',
-          },
-          {
-            id: 'early-access-deployed',
-            label: 'Deployed',
-            href: '/early-access/deployed',
-          },
-        ],
-      },
+      // Early Access — hidden until unlocked (demo Easter egg)
+      ...(earlyAccessUnlocked ? [earlyAccessGroup] : []),
       // Community Plugins (Expandable Group)
       {
         id: 'communityPlugins',
@@ -218,16 +289,35 @@ export const useNavigationData = (): NavDataItem[] => {
             label: 'Quickstarts',
             href: '/plugins/quickstarts',
           },
-          {
-            id: 'plugins-deployed',
-            label: 'Deployed',
-            href: '/plugins/deployed',
-          },
-          ...deployedPlugins.map((plugin) => ({
-            id: `plugin-${plugin.id}`,
-            label: plugin.name,
-            href: `/plugins/${plugin.id}/workspace`,
-          })),
+          ...(deployedPlugins.length > 0
+            ? [
+                {
+                  id: 'plugins-deployed-group',
+                  group: {
+                    id: 'plugins-deployed-group',
+                    title: 'Deployed',
+                  },
+                  children: [
+                    {
+                      id: 'plugins-deployed',
+                      label: 'All Deployed',
+                      href: '/plugins/deployed',
+                    },
+                    ...deployedPlugins.map((plugin) => ({
+                      id: `plugin-${plugin.id}`,
+                      label: plugin.name,
+                      href: `/plugins/${plugin.id}/workspace`,
+                    })),
+                  ],
+                } as NavDataItem,
+              ]
+            : [
+                {
+                  id: 'plugins-deployed',
+                  label: 'Deployed',
+                  href: '/plugins/deployed',
+                },
+              ]),
         ],
       },
       // Settings (Expandable Group - Admin Only)
@@ -268,5 +358,5 @@ export const useNavigationData = (): NavDataItem[] => {
     ];
 
     return navData;
-  }, [dynamicProjects, deployedPluginsVersion]);
+  }, [dynamicProjects, deployedPluginsVersion, earlyAccessVersion]);
 };

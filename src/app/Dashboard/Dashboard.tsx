@@ -23,13 +23,27 @@ import { DropText } from './DropText';
 import { GettingStartedChecklist } from '../components/GettingStartedChecklist';
 import { WhatsNewBanner } from '../components/WhatsNewBanner';
 import { CommunityPopover } from '../components/CommunityPopover';
+import {
+  isEarlyAccessUnlocked,
+  lockEarlyAccess,
+  unlockEarlyAccess,
+} from '../navData';
+import { useSidebar } from '../contexts/SidebarContext';
 import './Dashboard.css';
+
+const CLICK_WINDOW_MS = 2000;
+const REVEAL_DURATION_MS = 2500;
 
 const Dashboard: React.FunctionComponent = () => {
   const navigate = useNavigate();
+  const { setSidebarOpen } = useSidebar();
   const [recentProjects, setRecentProjects] = React.useState<string[]>([]);
   const [showSplash, setShowSplash] = React.useState(true);
   const [splashFading, setSplashFading] = React.useState(false);
+  const [showReveal, setShowReveal] = React.useState(false);
+  const [revealFading, setRevealFading] = React.useState(false);
+  const clickCountRef = React.useRef(0);
+  const clickTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     const projects = JSON.parse(localStorage.getItem('canvasProjects') || '[]');
@@ -47,11 +61,58 @@ const Dashboard: React.FunctionComponent = () => {
     return () => clearTimeout(timer);
   }, [showSplash]);
 
+  // Presenter reset: Ctrl+Shift+R clears Early Access unlock for repeat demos
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+        e.preventDefault();
+        lockEarlyAccess();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const dismissSplash = () => {
     setSplashFading(true);
     setTimeout(() => {
       setShowSplash(false);
     }, 500);
+  };
+
+  const triggerEarlyAccessReveal = React.useCallback(() => {
+    if (isEarlyAccessUnlocked() || showReveal) {
+      navigate('/early-access');
+      return;
+    }
+    unlockEarlyAccess();
+    setSidebarOpen(true);
+    setShowReveal(true);
+    setRevealFading(false);
+
+    window.setTimeout(() => {
+      setRevealFading(true);
+      window.setTimeout(() => {
+        setShowReveal(false);
+        setRevealFading(false);
+        navigate('/early-access');
+      }, 600);
+    }, REVEAL_DURATION_MS);
+  }, [navigate, setSidebarOpen, showReveal]);
+
+  const handleHeroTitleClick = () => {
+    if (clickTimerRef.current) {
+      window.clearTimeout(clickTimerRef.current);
+    }
+    clickCountRef.current += 1;
+    if (clickCountRef.current >= 3) {
+      clickCountRef.current = 0;
+      triggerEarlyAccessReveal();
+      return;
+    }
+    clickTimerRef.current = window.setTimeout(() => {
+      clickCountRef.current = 0;
+    }, CLICK_WINDOW_MS);
   };
 
   const quickStartItems = [
@@ -71,7 +132,7 @@ const Dashboard: React.FunctionComponent = () => {
       title: 'Community',
       description: 'Quickstarts, plugins, and developer previews',
       icon: <UsersIcon style={{ color: '#10b981', fontSize: '1.5rem' }} />,
-      action: () => navigate('/plugins/developer-preview'),
+      action: () => navigate('/plugins'),
       isCommunityTile: true,
     },
   ] as Array<{ title: string; description: string; icon: React.ReactNode; action?: () => void; isCommunityTile?: boolean }>;
@@ -99,9 +160,36 @@ const Dashboard: React.FunctionComponent = () => {
         </div>
       )}
 
+      {/* Early Access dramatic reveal overlay */}
+      {showReveal && (
+        <div className={`reveal-overlay ${revealFading ? 'reveal-fading' : ''}`} aria-live="assertive">
+          <div className="reveal-glow" />
+          <div className="reveal-content">
+            <p className="reveal-text">Early Access Unlocked</p>
+            <p className="reveal-subtitle">Explore what&apos;s coming next</p>
+          </div>
+        </div>
+      )}
+
       {/* Dashboard Content (visible after splash) */}
       <div className="dashboard-hero-bar">
-        <h1 className="dashboard-hero-title">Welcome to Red AI</h1>
+        <h1
+          className="dashboard-hero-title"
+          onClick={handleHeroTitleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleHeroTitleClick();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          title=""
+          aria-label="Welcome to Red AI"
+          style={{ cursor: 'default', userSelect: 'none' }}
+        >
+          Welcome to Red AI
+        </h1>
         <p className="dashboard-hero-subtitle">
           Build, deploy, and manage AI workflows with ease
         </p>
