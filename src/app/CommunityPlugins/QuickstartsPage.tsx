@@ -27,17 +27,200 @@ import {
   TabTitleText,
   EmptyState,
   EmptyStateBody,
+  Alert,
 } from '@patternfly/react-core';
 import {
   ArrowRightIcon,
   RocketIcon,
   CheckCircleIcon,
   ExternalLinkAltIcon,
+  UploadIcon,
 } from '@patternfly/react-icons';
 import { WORKFLOW_TEMPLATES, WorkflowTemplate } from '../../data/workflowTemplates';
 import { markCanvasLoadingTransition } from '../Canvas/utils/canvasLoadingTransition';
 import { DeployPhaseChecklist, DEPLOY_PHASE_ORDER } from '../components/DeployPhaseChecklist';
 import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
+
+/* ── BYOH: Bring Your Own Helm ── */
+
+type BYOHStep = 'input' | 'validate' | 'deploy';
+type BYOHSource = 'github' | 'repo' | 'upload';
+
+interface BYOHState {
+  step: BYOHStep;
+  source: BYOHSource;
+  url: string;
+  chartPath: string;
+  releaseName: string;
+  namespace: string;
+  validated: boolean;
+  deploying: boolean;
+  deployed: boolean;
+}
+
+const BYOH_INITIAL: BYOHState = {
+  step: 'input',
+  source: 'github',
+  url: '',
+  chartPath: '',
+  releaseName: '',
+  namespace: 'default',
+  validated: false,
+  deploying: false,
+  deployed: false,
+};
+
+const BYOHTab: React.FunctionComponent = () => {
+  const navigate = useNavigate();
+  const [s, setS] = React.useState<BYOHState>(BYOH_INITIAL);
+  const update = (patch: Partial<BYOHState>) => setS((prev) => ({ ...prev, ...patch }));
+
+  const handleValidate = () => {
+    update({ validated: false });
+    const slug = (s.releaseName || s.url.split('/').pop() || 'byoh-chart')
+      .toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'byoh-chart';
+    setTimeout(() => {
+      update({ validated: true, step: 'validate', releaseName: s.releaseName || slug });
+    }, 1200);
+  };
+
+  const handleDeploy = () => {
+    update({ deploying: true, step: 'deploy' });
+    const slug = (s.releaseName || 'byoh-chart').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const projects = JSON.parse(localStorage.getItem('canvasProjects') || '[]') as string[];
+    const displayName = `BYOH: ${s.releaseName}`;
+    if (!projects.includes(displayName)) {
+      projects.push(displayName);
+      localStorage.setItem('canvasProjects', JSON.stringify(projects));
+    }
+    localStorage.setItem(`workflow-${slug}`, JSON.stringify({
+      projectName: slug,
+      nodes: [{ id: `byoh-${Date.now()}`, type: 'helm-chart', label: s.releaseName, position: { x: 200, y: 200 }, data: { color: '#ec4899', description: `Helm chart from ${s.url}` } }],
+      connections: [],
+      timestamp: new Date().toISOString(),
+      templateId: 'byoh-custom',
+    }));
+    window.dispatchEvent(new Event('projectsUpdated'));
+    setTimeout(() => update({ deploying: false, deployed: true }), 2000);
+  };
+
+  const sourceLabels: Record<BYOHSource, string> = { github: 'GitHub Repository', repo: 'Helm Repo URL', upload: 'Chart Archive' };
+  const sourcePlaceholders: Record<BYOHSource, string> = {
+    github: 'https://github.com/org/repo (or org/repo)',
+    repo: 'https://charts.example.com/my-chart',
+    upload: 'https://example.com/chart-0.1.0.tgz',
+  };
+
+  return (
+    <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ marginTop: 12 }}>
+      {/* step indicator */}
+      <FlexItem>
+        <Flex gap={{ default: 'gapMd' }}>
+          <Label color={s.step === 'input' ? 'blue' : 'grey'} isCompact>1. Provide Source</Label>
+          <ArrowRightIcon style={{ color: '#d1d5db' }} />
+          <Label color={s.step === 'validate' ? 'blue' : 'grey'} isCompact>2. Validate &amp; Configure</Label>
+          <ArrowRightIcon style={{ color: '#d1d5db' }} />
+          <Label color={s.step === 'deploy' ? 'green' : 'grey'} isCompact>3. Deploy</Label>
+        </Flex>
+      </FlexItem>
+      <Divider />
+
+      {s.step === 'input' && (
+        <FlexItem>
+          <Card>
+            <CardHeader><CardTitle>Bring Your Own Helm Chart</CardTitle></CardHeader>
+            <CardBody>
+              <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+                <FormGroup label="Source type" fieldId="byoh-source">
+                  <Flex gap={{ default: 'gapSm' }}>
+                    {(Object.keys(sourceLabels) as BYOHSource[]).map((key) => (
+                      <FlexItem key={key}>
+                        <Button variant={s.source === key ? 'primary' : 'secondary'} size="sm" onClick={() => update({ source: key })}>
+                          {sourceLabels[key]}
+                        </Button>
+                      </FlexItem>
+                    ))}
+                  </Flex>
+                </FormGroup>
+                <FormGroup label={sourceLabels[s.source]} isRequired fieldId="byoh-url">
+                  <TextInput id="byoh-url" isRequired placeholder={sourcePlaceholders[s.source]} value={s.url} onChange={(_e, v) => update({ url: v })} />
+                </FormGroup>
+                {s.source === 'github' && (
+                  <FormGroup label="Chart path (optional)" fieldId="byoh-path">
+                    <TextInput id="byoh-path" placeholder="charts/my-app" value={s.chartPath} onChange={(_e, v) => update({ chartPath: v })} />
+                  </FormGroup>
+                )}
+                <FormGroup label="Release name" fieldId="byoh-release">
+                  <TextInput id="byoh-release" placeholder="my-release" value={s.releaseName} onChange={(_e, v) => update({ releaseName: v })} />
+                </FormGroup>
+                <FormGroup label="Namespace" fieldId="byoh-ns">
+                  <TextInput id="byoh-ns" value={s.namespace} onChange={(_e, v) => update({ namespace: v })} />
+                </FormGroup>
+                <Button variant="primary" icon={<ArrowRightIcon />} iconPosition="end" onClick={handleValidate} isDisabled={!s.url.trim()}>
+                  Validate Chart
+                </Button>
+              </Flex>
+            </CardBody>
+          </Card>
+        </FlexItem>
+      )}
+
+      {s.step === 'validate' && (
+        <FlexItem>
+          <Card style={{ borderTop: '3px solid #ec4899' }}>
+            <CardHeader><CardTitle>Chart Validated</CardTitle></CardHeader>
+            <CardBody>
+              <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+                {s.validated ? (
+                  <Alert variant="success" isInline title="Chart is valid and ready to deploy" />
+                ) : (
+                  <Alert variant="info" isInline title="Validating chart structure..." />
+                )}
+                <DescriptionList isHorizontal>
+                  <DescriptionListGroup><DescriptionListTerm>Source</DescriptionListTerm><DescriptionListDescription>{s.url}</DescriptionListDescription></DescriptionListGroup>
+                  <DescriptionListGroup><DescriptionListTerm>Release</DescriptionListTerm><DescriptionListDescription>{s.releaseName}</DescriptionListDescription></DescriptionListGroup>
+                  <DescriptionListGroup><DescriptionListTerm>Namespace</DescriptionListTerm><DescriptionListDescription>{s.namespace}</DescriptionListDescription></DescriptionListGroup>
+                  {s.chartPath && <DescriptionListGroup><DescriptionListTerm>Chart path</DescriptionListTerm><DescriptionListDescription>{s.chartPath}</DescriptionListDescription></DescriptionListGroup>}
+                </DescriptionList>
+                <Flex gap={{ default: 'gapSm' }}>
+                  <Button variant="primary" icon={<RocketIcon />} onClick={handleDeploy} isDisabled={!s.validated}>Deploy</Button>
+                  <Button variant="link" onClick={() => update({ step: 'input', validated: false })}>Back</Button>
+                </Flex>
+              </Flex>
+            </CardBody>
+          </Card>
+        </FlexItem>
+      )}
+
+      {s.step === 'deploy' && (
+        <FlexItem>
+          {s.deploying ? (
+            <Card><CardBody>
+              <DeployPhaseChecklist title={`Deploying ${s.releaseName}`} subtitle={`From ${s.url}`} activePhaseIndex={3} isComplete={false} />
+            </CardBody></Card>
+          ) : s.deployed ? (
+            <Card style={{ borderTop: '3px solid #10b981' }}>
+              <CardBody>
+                <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ textAlign: 'center', padding: '2rem 0' }}>
+                  <FlexItem><CheckCircleIcon style={{ fontSize: '3rem', color: '#10b981' }} /></FlexItem>
+                  <FlexItem><Title headingLevel="h3" size="lg">Helm chart deployed successfully</Title></FlexItem>
+                  <FlexItem>
+                    <Content><p style={{ color: '#6b7280' }}>{s.releaseName} is running in namespace {s.namespace}.</p></Content>
+                  </FlexItem>
+                  <FlexItem>
+                    <Flex gap={{ default: 'gapSm' }} justifyContent={{ default: 'justifyContentCenter' }}>
+                      <Button variant="secondary" onClick={() => setS(BYOH_INITIAL)}>Deploy Another</Button>
+                    </Flex>
+                  </FlexItem>
+                </Flex>
+              </CardBody>
+            </Card>
+          ) : null}
+        </FlexItem>
+      )}
+    </Flex>
+  );
+};
 
 type WizardStep = 'choose' | 'configure' | 'launch';
 
@@ -459,7 +642,11 @@ const QuickstartsPage: React.FunctionComponent = () => {
               </Flex>
             </Tab>
 
-            <Tab eventKey={1} title={<TabTitleText><CheckCircleIcon style={{ marginRight: '6px' }} />Deployed Quickstarts{deployedQuickstarts.length > 0 ? ` (${deployedQuickstarts.length})` : ''}</TabTitleText>}>
+            <Tab eventKey={1} title={<TabTitleText><UploadIcon style={{ marginRight: '6px' }} />BYOH</TabTitleText>}>
+              <BYOHTab />
+            </Tab>
+
+            <Tab eventKey={2} title={<TabTitleText><CheckCircleIcon style={{ marginRight: '6px' }} />Deployed Quickstarts{deployedQuickstarts.length > 0 ? ` (${deployedQuickstarts.length})` : ''}</TabTitleText>}>
               <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ marginTop: '12px', padding: '4px 0' }}>
                 {deployedQuickstarts.length === 0 ? (
                   <FlexItem>

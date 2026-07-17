@@ -1,0 +1,34 @@
+.feature-feedback-panel {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.feature-feedback-panel--submitted {
+  background: #fff;
+}
+
+.feature-feedback-panel__summary-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.feature-feedback-panel__summary-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.feature-feedback-panel__comment-preview {
+  font-size: 0.85rem;
+  color: #374151;
+  font-style: italic;
+  white-space: pre-wrap;
+}

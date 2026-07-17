@@ -29,6 +29,7 @@
     "clean": "rimraf dist"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.6.1",
@@ -60,6 +61,7 @@
     "react-docgen-typescript-loader": "^3.7.2",
     "regenerator-runtime": "^0.14.1",
     "rimraf": "^6.0.1",
+    "sirv-cli": "^3.0.0",
     "style-loader": "^4.0.0",
     "svg-url-loader": "^8.0.0",
     "terser-webpack-plugin": "^5.3.10",
@@ -73,8 +75,7 @@
     "webpack-bundle-analyzer": "^4.10.2",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.1.0",
-    "webpack-merge": "^6.0.1",
-    "sirv-cli": "^3.0.0"
+    "webpack-merge": "^6.0.1"
   },
   "dependencies": {
     "@patternfly/react-charts": "^8.4.0",

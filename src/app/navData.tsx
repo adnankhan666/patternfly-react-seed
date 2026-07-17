@@ -180,6 +180,26 @@ export const useNavigationData = (): NavDataItem[] => {
         label: 'Telemetry',
         href: '/telemetry',
       },
+      // Early Access (Expandable Group) — DP/TP features; sandboxes are NOT nav items
+      {
+        id: 'earlyAccess',
+        group: {
+          id: 'earlyAccess',
+          title: 'Early Access',
+        },
+        children: [
+          {
+            id: 'early-access-overview',
+            label: 'Overview',
+            href: '/early-access',
+          },
+          {
+            id: 'early-access-deployed',
+            label: 'Deployed',
+            href: '/early-access/deployed',
+          },
+        ],
+      },
       // Community Plugins (Expandable Group)
       {
         id: 'communityPlugins',
@@ -199,14 +219,9 @@ export const useNavigationData = (): NavDataItem[] => {
             href: '/plugins/quickstarts',
           },
           {
-            id: 'plugins-developer-preview',
-            label: 'Developer Preview',
-            href: '/plugins/developer-preview',
-          },
-          {
-            id: 'plugins-technical-preview',
-            label: 'Technical Preview',
-            href: '/plugins/technical-preview',
+            id: 'plugins-deployed',
+            label: 'Deployed',
+            href: '/plugins/deployed',
           },
           ...deployedPlugins.map((plugin) => ({
             id: `plugin-${plugin.id}`,

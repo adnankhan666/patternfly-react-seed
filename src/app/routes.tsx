@@ -19,9 +19,11 @@ const DynamicProject = React.lazy(() => import('@app/Canvas/DynamicProject').the
 const PluginDetail = React.lazy(() => import('@app/CommunityPlugins/PluginDetail').then(m => ({ default: m.PluginDetail })));
 const PluginWorkspace = React.lazy(() => import('@app/CommunityPlugins/PluginWorkspace').then(m => ({ default: m.PluginWorkspace })));
 const QuickstartsPage = React.lazy(() => import('@app/CommunityPlugins/QuickstartsPage').then(m => ({ default: m.QuickstartsPage })));
-const DeveloperPreviewPage = React.lazy(() => import('@app/CommunityPlugins/DeveloperPreviewPage').then(m => ({ default: m.DeveloperPreviewPage })));
-const TechnicalPreviewPage = React.lazy(() => import('@app/CommunityPlugins/TechnicalPreviewPage').then(m => ({ default: m.TechnicalPreviewPage })));
 const CommunityPluginsLanding = React.lazy(() => import('@app/CommunityPlugins/CommunityPluginsLanding').then(m => ({ default: m.CommunityPluginsLanding })));
+const CommunityPluginsDeployed = React.lazy(() => import('@app/CommunityPlugins/CommunityPluginsDeployed').then(m => ({ default: m.CommunityPluginsDeployed })));
+const EarlyAccessOverview = React.lazy(() => import('@app/EarlyAccess/EarlyAccessOverview').then(m => ({ default: m.EarlyAccessOverview })));
+const EarlyAccessDeployed = React.lazy(() => import('@app/EarlyAccess/EarlyAccessDeployed').then(m => ({ default: m.EarlyAccessDeployed })));
+const FeatureSandbox = React.lazy(() => import('@app/EarlyAccess/FeatureSandbox').then(m => ({ default: m.FeatureSandbox })));
 const Projects = React.lazy(() => import('@app/Projects/Projects').then(m => ({ default: m.Projects })));
 const Pipelines = React.lazy(() => import('@app/Pipelines/Pipelines').then(m => ({ default: m.Pipelines })));
 const PipelineRuns = React.lazy(() => import('@app/Pipelines/PipelineRuns').then(m => ({ default: m.PipelineRuns })));
@@ -103,6 +105,24 @@ const routes: AppRouteConfig[] = [
     title: 'ODH Dashboard | Quickstart',
   },
   {
+    element: <EarlyAccessOverview />,
+    exact: true,
+    path: '/early-access',
+    title: 'ODH Dashboard | Early Access',
+  },
+  {
+    element: <EarlyAccessDeployed />,
+    exact: true,
+    path: '/early-access/deployed',
+    title: 'ODH Dashboard | Early Access Deployed',
+  },
+  {
+    element: <FeatureSandbox />,
+    exact: true,
+    path: '/early-access/deployed/:featureId',
+    title: 'ODH Dashboard | Feature Sandbox',
+  },
+  {
     element: <CommunityPluginsLanding />,
     exact: true,
     path: '/plugins',
@@ -115,13 +135,19 @@ const routes: AppRouteConfig[] = [
     title: 'ODH Dashboard | Quickstarts',
   },
   {
-    element: <DeveloperPreviewPage />,
+    element: <CommunityPluginsDeployed />,
+    exact: true,
+    path: '/plugins/deployed',
+    title: 'ODH Dashboard | Deployed Plugins',
+  },
+  {
+    element: <Navigate to="/early-access" replace />,
     exact: true,
     path: '/plugins/developer-preview',
     title: 'ODH Dashboard | Developer Preview',
   },
   {
-    element: <TechnicalPreviewPage />,
+    element: <Navigate to="/early-access" replace />,
     exact: true,
     path: '/plugins/technical-preview',
     title: 'ODH Dashboard | Technical Preview',
