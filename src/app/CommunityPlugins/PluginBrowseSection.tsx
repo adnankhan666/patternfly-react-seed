@@ -17,7 +17,7 @@ import {
   SearchInput,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
-import { PLUGINS, PLUGIN_CATEGORIES, getPluginWorkspacePath, getDeployedPluginIds, PLUGIN_DEPLOYED_EVENT } from '../../data/pluginRegistry';
+import { PLUGINS, PLUGIN_CATEGORIES, getPluginWorkspacePath, getDeployedPluginIds, PLUGIN_STATE_EVENT } from '../../data/pluginRegistry';
 
 interface PluginBrowseSectionProps {
   showSectionHeader?: boolean;
@@ -47,20 +47,20 @@ const PluginBrowseSection: React.FunctionComponent<PluginBrowseSectionProps> = (
     refresh();
     localStorage.setItem('visitedPlugins', 'true');
     window.addEventListener('storage', refresh);
-    window.addEventListener(PLUGIN_DEPLOYED_EVENT, refresh);
+    window.addEventListener(PLUGIN_STATE_EVENT, refresh);
     return () => {
       window.removeEventListener('storage', refresh);
-      window.removeEventListener(PLUGIN_DEPLOYED_EVENT, refresh);
+      window.removeEventListener(PLUGIN_STATE_EVENT, refresh);
     };
   }, []);
 
   const sourcePlugins = deployedOnly
-    ? PLUGINS.filter((p) => deployedPlugins.has(p.id))
+    ? PLUGINS.filter((p) => deployedPlugins.has(p.name))
     : PLUGINS;
 
   const filtered = sourcePlugins.filter((p) => {
     const matchesSearch = !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.displayName.toLowerCase().includes(search.toLowerCase()) ||
       p.description.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = !activeCategory || p.category === activeCategory;
     return matchesSearch && matchesCategory;
@@ -133,15 +133,15 @@ const PluginBrowseSection: React.FunctionComponent<PluginBrowseSectionProps> = (
         ) : (
           <Gallery hasGutter minWidths={{ default: '240px' }} maxWidths={{ default: '1fr' }} style={{ padding: '3px' }}>
             {filtered.map((plugin) => {
-              const isDeployed = deployedPlugins.has(plugin.id);
+              const isDeployed = deployedPlugins.has(plugin.name);
               const color = categoryColors[plugin.category] || '#6b7280';
               return (
-                <GalleryItem key={plugin.id}>
+                <GalleryItem key={plugin.name}>
                   <Card
                     isCompact
                     isFullHeight
                     style={{ borderTop: `3px solid ${color}`, cursor: 'pointer' }}
-                    onClick={() => navigate(`/plugins/${plugin.id}`)}
+                    onClick={() => navigate(`/plugins/${plugin.name}`)}
                   >
                     <CardHeader>
                       <CardTitle>
@@ -150,11 +150,11 @@ const PluginBrowseSection: React.FunctionComponent<PluginBrowseSectionProps> = (
                             <span style={{ fontSize: '1.5rem' }}>{plugin.icon}</span>
                           </FlexItem>
                           <FlexItem flex={{ default: 'flex_1' }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{plugin.name}</span>
+                            <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{plugin.displayName}</span>
                           </FlexItem>
                           {isDeployed && (
                             <FlexItem>
-                              <Label color="blue" isCompact>Deployed</Label>
+                              <Label color="blue" isCompact>Installed</Label>
                             </FlexItem>
                           )}
                         </Flex>
@@ -184,7 +184,7 @@ const PluginBrowseSection: React.FunctionComponent<PluginBrowseSectionProps> = (
                                 icon={<ExternalLinkAltIcon />}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate(getPluginWorkspacePath(plugin.id));
+                                  navigate(getPluginWorkspacePath(plugin.name));
                                 }}
                               >
                                 Workspace

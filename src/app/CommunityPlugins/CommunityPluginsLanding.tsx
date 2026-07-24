@@ -34,6 +34,7 @@ import {
   UploadIcon,
 } from '@patternfly/react-icons';
 import { PluginBrowseSection } from './PluginBrowseSection';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 interface LandingTile {
   id: string;
@@ -274,6 +275,10 @@ const CommunityPluginsLanding: React.FunctionComponent = () => {
               Launch guided templates, browse the plugin catalog, bring your own plugins, and manage your deployed workspaces.
             </p>
           </Content>
+        </FlexItem>
+
+        <FlexItem>
+          <SupportLevelBanner context="community-plugins" />
         </FlexItem>
 
         <FlexItem>

@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { getDeployedPlugins, PLUGIN_DEPLOYED_EVENT } from '../data/pluginRegistry';
+import { getDeployedPlugins, PLUGIN_STATE_EVENT } from '../data/pluginRegistry';
 import { getDeployedFeatures, FEATURE_EXPERIENCED_EVENT } from '../data/featureExperienceStore';
 import { getEarlyAccessFeatureById } from '../data/previewFeatures';
+import { isCommunityPluginsEnabled, COMMUNITY_PLUGINS_TOGGLED_EVENT } from './Settings/ClusterSettings';
 
 export interface NavDataHref {
   id: string;
@@ -50,6 +51,7 @@ export const useNavigationData = (): NavDataItem[] => {
   const [dynamicProjects, setDynamicProjects] = React.useState<string[]>([]);
   const [deployedPluginsVersion, setDeployedPluginsVersion] = React.useState(0);
   const [earlyAccessVersion, setEarlyAccessVersion] = React.useState(0);
+  const [communityPluginsVersion, setCommunityPluginsVersion] = React.useState(0);
 
   React.useEffect(() => {
     // Load projects from localStorage
@@ -77,11 +79,11 @@ export const useNavigationData = (): NavDataItem[] => {
     const refreshDeployedPlugins = () => setDeployedPluginsVersion((v) => v + 1);
 
     window.addEventListener('storage', refreshDeployedPlugins);
-    window.addEventListener(PLUGIN_DEPLOYED_EVENT, refreshDeployedPlugins);
+    window.addEventListener(PLUGIN_STATE_EVENT, refreshDeployedPlugins);
 
     return () => {
       window.removeEventListener('storage', refreshDeployedPlugins);
-      window.removeEventListener(PLUGIN_DEPLOYED_EVENT, refreshDeployedPlugins);
+      window.removeEventListener(PLUGIN_STATE_EVENT, refreshDeployedPlugins);
     };
   }, []);
 
@@ -97,11 +99,19 @@ export const useNavigationData = (): NavDataItem[] => {
     };
   }, []);
 
+  React.useEffect(() => {
+    const refreshCommunity = () => setCommunityPluginsVersion((v) => v + 1);
+    window.addEventListener(COMMUNITY_PLUGINS_TOGGLED_EVENT, refreshCommunity);
+    return () => window.removeEventListener(COMMUNITY_PLUGINS_TOGGLED_EVENT, refreshCommunity);
+  }, []);
+
   return React.useMemo(() => {
     void deployedPluginsVersion;
     void earlyAccessVersion;
+    void communityPluginsVersion;
     const deployedPlugins = getDeployedPlugins();
     const earlyAccessUnlocked = isEarlyAccessUnlocked();
+    const communityPluginsEnabled = isCommunityPluginsEnabled();
 
     const deployedFeatures = getDeployedFeatures().filter((d) => d.status !== 'stopped');
 
@@ -271,8 +281,8 @@ export const useNavigationData = (): NavDataItem[] => {
       },
       // Early Access — hidden until unlocked (demo Easter egg)
       ...(earlyAccessUnlocked ? [earlyAccessGroup] : []),
-      // Community Plugins (Expandable Group)
-      {
+      // Community Plugins -- gated by admin settings (OdhDashboardConfig)
+      ...(communityPluginsEnabled ? [{
         id: 'communityPlugins',
         group: {
           id: 'communityPlugins',
@@ -304,9 +314,9 @@ export const useNavigationData = (): NavDataItem[] => {
                       href: '/plugins/deployed',
                     },
                     ...deployedPlugins.map((plugin) => ({
-                      id: `plugin-${plugin.id}`,
-                      label: plugin.name,
-                      href: `/plugins/${plugin.id}/workspace`,
+                      id: `plugin-${plugin.name}`,
+                      label: plugin.displayName,
+                      href: `/plugins/${plugin.name}/workspace`,
                     })),
                   ],
                 } as NavDataItem,
@@ -319,7 +329,7 @@ export const useNavigationData = (): NavDataItem[] => {
                 },
               ]),
         ],
-      },
+      } as NavDataItem] : []),
       // Settings (Expandable Group - Admin Only)
       {
         id: 'settings',
@@ -358,5 +368,5 @@ export const useNavigationData = (): NavDataItem[] => {
     ];
 
     return navData;
-  }, [dynamicProjects, deployedPluginsVersion, earlyAccessVersion]);
+  }, [dynamicProjects, deployedPluginsVersion, earlyAccessVersion, communityPluginsVersion]);
 };

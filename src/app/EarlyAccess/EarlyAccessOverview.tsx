@@ -35,6 +35,7 @@ import {
   FEATURE_STARRED_EVENT,
 } from '../../data/featureInterestStore';
 import { EarlyAccessBreadcrumb } from './EarlyAccessBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 const CATEGORIES = ['AI/ML', 'Infrastructure', 'Data Management'] as const;
 
@@ -192,6 +193,10 @@ const EarlyAccessOverview: React.FunctionComponent = () => {
                     Explore developer and technical preview features, star your favorites, and experience them in a sandbox
                   </p>
                 </Content>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <SupportLevelBanner context="early-access" />
               </div>
 
               {feedbackNotice && (

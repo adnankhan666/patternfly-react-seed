@@ -33,7 +33,7 @@ const buildPluginWorkflowTab = (plugin: Plugin): ProjectWorkflowTab => {
   const timestamp = Date.now();
   const nodes: NodeData[] = plugin.nodes.map((node, idx) => ({
     id: `node-${timestamp}-${idx}`,
-    type: `plugin-${plugin.id}-${node.type}`,
+    type: `plugin-${plugin.name}-${node.type}`,
     label: node.label,
     position: {
       x: PLUGIN_NODE_START_X + idx * PLUGIN_NODE_SPACING,
@@ -56,11 +56,11 @@ const buildPluginWorkflowTab = (plugin: Plugin): ProjectWorkflowTab => {
   }));
 
   return {
-    id: `workflow-${plugin.id}-${timestamp}`,
-    name: plugin.name,
+    id: `workflow-${plugin.name}-${timestamp}`,
+    name: plugin.displayName,
     nodes,
     connections,
-    pluginId: plugin.id,
+    pluginId: plugin.name,
   };
 };
 
@@ -107,7 +107,7 @@ export const appendPluginWorkflowToProject = (
           connections: [],
         }];
 
-  const existingTabIndex = projectWorkflows.findIndex((wf) => wf.pluginId === plugin.id);
+  const existingTabIndex = projectWorkflows.findIndex((wf) => wf.pluginId === plugin.name);
   let activeTabIndex: number;
 
   if (existingTabIndex >= 0) {

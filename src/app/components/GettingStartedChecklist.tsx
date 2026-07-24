@@ -52,7 +52,7 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'explore-plugins',
     label: 'Browse Community Plugins',
-    route: '/plugins/developer-preview?tab=plugins',
+    route: '/plugins',
     check: () => getDeployedPluginIds().length > 0,
   },
   {

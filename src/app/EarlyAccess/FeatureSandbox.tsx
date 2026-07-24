@@ -53,6 +53,7 @@ import { DeployPhaseChecklist, DEPLOY_PHASE_ORDER } from '../components/DeployPh
 import { FeatureMockupPreview } from '../CommunityPlugins/FeatureMockupPreview';
 import '../CommunityPlugins/PluginWorkspace.css';
 import { EarlyAccessBreadcrumb } from './EarlyAccessBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 function toProjectSlug(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'early-access-sandbox';
@@ -266,17 +267,116 @@ const VLLMSandbox: React.FC = () => {
 };
 
 /* ── Agent Catalog ── */
+const AGENT_RECIPES = [
+  { id: 'support', name: 'Support Agent', desc: 'Customer queries', tools: 3 },
+  { id: 'research', name: 'Research Agent', desc: 'Paper summaries', tools: 5 },
+  { id: 'ops', name: 'Ops Agent', desc: 'Infra runbooks', tools: 4 },
+];
+
+interface DeployedAgent {
+  id: string;
+  name: string;
+  deployedAt: string;
+  invocations: number;
+  avgLatency: string;
+  status: 'deploying' | 'running';
+  progress: number;
+}
+
 const AgentCatalogSandbox: React.FC = () => {
   const [nav, setNav] = React.useState('Recipes');
   const [selected, setSelected] = React.useState<string | null>(null);
-  const agents = [{ id: 'support', name: 'Support Agent', desc: 'Customer queries', tools: 3 }, { id: 'research', name: 'Research Agent', desc: 'Paper summaries', tools: 5 }, { id: 'ops', name: 'Ops Agent', desc: 'Infra runbooks', tools: 4 }];
+  const [deployed, setDeployed] = React.useState<DeployedAgent[]>([
+    { id: 'support', name: 'Support Agent', deployedAt: 'Jul 15', invocations: 2140, avgLatency: '4.2s', status: 'running', progress: 100 },
+    { id: 'research', name: 'Research Agent', deployedAt: 'Jul 12', invocations: 420, avgLatency: '8.1s', status: 'running', progress: 100 },
+  ]);
+
+  const handleDeploy = React.useCallback(() => {
+    if (!selected) return;
+    const recipe = AGENT_RECIPES.find((a) => a.id === selected);
+    if (!recipe) return;
+    if (deployed.some((d) => d.id === selected)) { setNav('Deployed'); return; }
+
+    const now = new Date();
+    const dateStr = `${now.toLocaleString('en-US', { month: 'short' })} ${now.getDate()}`;
+    const newAgent: DeployedAgent = {
+      id: recipe.id, name: recipe.name, deployedAt: dateStr,
+      invocations: 0, avgLatency: '—', status: 'deploying', progress: 0,
+    };
+    setDeployed((prev) => [...prev, newAgent]);
+    setNav('Deployed');
+  }, [selected, deployed]);
+
+  React.useEffect(() => {
+    const deploying = deployed.find((d) => d.status === 'deploying');
+    if (!deploying) return undefined;
+    if (deploying.progress >= 100) {
+      setDeployed((prev) => prev.map((d) => d.id === deploying.id ? { ...d, status: 'running' as const, avgLatency: '3.8s' } : d));
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      setDeployed((prev) => prev.map((d) => d.id === deploying.id ? { ...d, progress: Math.min(d.progress + 20, 100) } : d));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [deployed]);
+
+  const alreadyDeployed = selected ? deployed.some((d) => d.id === selected) : false;
+
   return (
-    <AppShell navItems={['Recipes', 'Deployed', 'MCP Tools', 'Activity', 'Settings']} activeNav={nav} onNav={setNav} accent="#14b8a6" statusText="Agent Catalog | 3 recipes available">
+    <AppShell navItems={['Recipes', 'Deployed', 'MCP Tools', 'Activity', 'Settings']} activeNav={nav} onNav={setNav} accent="#14b8a6" statusText={`Agent Catalog | ${deployed.filter((d) => d.status === 'running').length} agents running`}>
       {nav === 'Recipes' && <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-        <Flex gap={{ default: 'gapMd' }} flexWrap={{ default: 'wrap' }}>{agents.map((a) => (<FlexItem key={a.id} style={{ flex: '1 1 160px' }}><Card isSelectable isSelected={selected === a.id} onClick={() => setSelected(a.id)} style={{ cursor: 'pointer', borderTop: selected === a.id ? '3px solid #14b8a6' : '3px solid transparent' }}><CardBody><strong>{a.name}</strong><p style={{ color: '#6b7280', fontSize: '0.8rem', margin: '4px 0' }}>{a.desc}</p><Label isCompact>{a.tools} tools</Label></CardBody></Card></FlexItem>))}</Flex>
-        {selected && <Button variant="primary" icon={<PlayIcon />}>Deploy Agent</Button>}
+        <Flex gap={{ default: 'gapMd' }} flexWrap={{ default: 'wrap' }}>{AGENT_RECIPES.map((a) => {
+          const isDeployed = deployed.some((d) => d.id === a.id && d.status === 'running');
+          return (
+            <FlexItem key={a.id} style={{ flex: '1 1 160px' }}>
+              <Card isSelectable isSelected={selected === a.id} onClick={() => setSelected(a.id)} style={{ cursor: 'pointer', borderTop: selected === a.id ? '3px solid #14b8a6' : '3px solid transparent' }}>
+                <CardBody>
+                  <strong>{a.name}</strong>
+                  <p style={{ color: '#6b7280', fontSize: '0.8rem', margin: '4px 0' }}>{a.desc}</p>
+                  <Flex gap={{ default: 'gapSm' }}>
+                    <FlexItem><Label isCompact>{a.tools} tools</Label></FlexItem>
+                    {isDeployed && <FlexItem><Label isCompact color="green">Deployed</Label></FlexItem>}
+                  </Flex>
+                </CardBody>
+              </Card>
+            </FlexItem>
+          );
+        })}</Flex>
+        {selected && (
+          <Button variant="primary" icon={alreadyDeployed ? <CheckCircleIcon /> : <PlayIcon />} onClick={handleDeploy}>
+            {alreadyDeployed ? 'View Deployed Agent' : 'Deploy Agent'}
+          </Button>
+        )}
       </Flex>}
-      {nav === 'Deployed' && <WorkspaceTable headers={['Agent', 'Status', 'Invocations', 'Avg Latency', 'Deployed']} rows={[['Support Agent', <Label key="1" color="green">Running</Label>, '2,140', '4.2s', 'Jul 15'], ['Research Agent', <Label key="2" color="green">Running</Label>, '420', '8.1s', 'Jul 12']]} />}
+      {nav === 'Deployed' && (
+        deployed.length === 0
+          ? <Alert variant="info" isInline title="No agents deployed">Select a recipe and click Deploy Agent to get started.</Alert>
+          : <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+              {deployed.map((d) => (
+                d.status === 'deploying' ? (
+                  <FlexItem key={d.id}>
+                    <Card><CardBody>
+                      <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                        <FlexItem flex={{ default: 'flex_1' }}><strong>{d.name}</strong></FlexItem>
+                        <FlexItem><Label color="blue" isCompact>Deploying</Label></FlexItem>
+                      </Flex>
+                      <Progress value={d.progress} title="Provisioning agent..." measureLocation={ProgressMeasureLocation.outside} style={{ marginTop: 8 }} />
+                    </CardBody></Card>
+                  </FlexItem>
+                ) : null
+              ))}
+              <WorkspaceTable
+                headers={['Agent', 'Status', 'Invocations', 'Avg Latency', 'Deployed']}
+                rows={deployed.filter((d) => d.status === 'running').map((d) => [
+                  d.name,
+                  <Label key={`s-${d.id}`} color="green">Running</Label>,
+                  d.invocations.toLocaleString(),
+                  d.avgLatency,
+                  d.deployedAt,
+                ])}
+              />
+            </Flex>
+      )}
       {nav === 'MCP Tools' && <WorkspaceTable headers={['Tool', 'Server', 'Type', 'Status']} rows={[['search_docs', 'knowledge-base', 'Read', <Label key="1" color="green">Connected</Label>], ['create_ticket', 'jira', 'Write', <Label key="2" color="green">Connected</Label>], ['query_db', 'postgres', 'Read', <Label key="3" color="green">Connected</Label>], ['send_email', 'smtp', 'Write', <Label key="4" color="grey">Disabled</Label>]]} />}
       {nav === 'Activity' && <WorkspaceTable headers={['Agent', 'Action', 'Tools Used', 'Duration', 'Status']} rows={[['Support', 'Answer ticket #4821', '2', '4.2s', <Label key="1" color="green">Done</Label>], ['Research', 'Summarize arXiv paper', '3', '8.1s', <Label key="2" color="green">Done</Label>], ['Ops', 'Check cluster health', '4', '—', <Label key="3" color="blue">Running</Label>]]} />}
       {nav === 'Settings' && <WorkspaceTable headers={['Setting', 'Value', 'Scope']} rows={[['Max concurrent agents', '5', 'Global'], ['Tool timeout', '30s', 'Per-tool'], ['Retry on failure', 'Enabled', 'Per-agent']]} />}
@@ -405,6 +505,10 @@ const FeatureSandbox: React.FunctionComponent = () => {
               {feature.description}
             </p>
           </Content>
+        </FlexItem>
+
+        <FlexItem>
+          <SupportLevelBanner context="early-access" />
         </FlexItem>
 
         {/* ── Summary metric tiles ── */}

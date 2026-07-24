@@ -5,7 +5,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: linear-gradient(135deg, #c2185b 0%, #e05577 30%, #f47c8e 60%, #ff9aaa 100%);
+  background: linear-gradient(135deg, #0f1729 0%, #1a2744 40%, #1e3a5f 70%, #234b78 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,7 +84,7 @@
 
 /* Hero Bar (shown after splash dismisses) */
 .dashboard-hero-bar {
-  background: linear-gradient(135deg, #c2185b 0%, #e05577 50%, #f47c8e 100%);
+  background: linear-gradient(135deg, #0f1729 0%, #1a2744 50%, #1e3a5f 100%);
   padding: 2rem 2rem 1.5rem;
   text-align: center;
 }

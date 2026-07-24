@@ -27,6 +27,7 @@ import {
   FeatureDeployment,
 } from '../../data/featureExperienceStore';
 import { EarlyAccessBreadcrumb } from './EarlyAccessBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 const statusColor = (status: FeatureDeployment['status']): 'blue' | 'green' | 'grey' => {
   if (status === 'running') return 'green';
@@ -69,6 +70,10 @@ const EarlyAccessDeployed: React.FunctionComponent = () => {
               Features you have experienced via Early Access sandboxes. These pages are not listed in the main navigation.
             </p>
           </Content>
+        </FlexItem>
+
+        <FlexItem>
+          <SupportLevelBanner context="early-access" />
         </FlexItem>
 
         <FlexItem>

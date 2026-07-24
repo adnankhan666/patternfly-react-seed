@@ -48,13 +48,14 @@ import {
 } from '@patternfly/react-icons';
 import {
   getPluginById,
-  getDeployedPluginIds,
+  isPluginInstalled,
   getPluginCanvasProjectName,
   PLUGIN_CATEGORIES,
   Plugin,
 } from '../../data/pluginRegistry';
 import { appendPluginWorkflowToProject } from './pluginCanvasIntegration';
 import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 import './PluginWorkspace.css';
 
 interface WorkspaceTableProps {
@@ -577,7 +578,7 @@ const WorkspaceHeader: React.FunctionComponent<WorkspaceHeaderProps> = ({
           </FlexItem>
           <FlexItem flex={{ default: 'flex_1' }}>
             <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} wrap="wrap">
-              <Title headingLevel="h1" size="2xl">{plugin.name} Workspace</Title>
+              <Title headingLevel="h1" size="2xl">{plugin.displayName} Workspace</Title>
               <Label isCompact style={{ background: `${color}18`, color }}>
                 {PLUGIN_CATEGORIES[plugin.category]}
               </Label>
@@ -625,7 +626,7 @@ const PluginWorkspace: React.FunctionComponent = () => {
   const plugin = pluginId ? getPluginById(pluginId) : undefined;
   const [running, setRunning] = React.useState(true);
 
-  const isDeployed = pluginId ? getDeployedPluginIds().includes(pluginId) : false;
+  const isDeployed = pluginId ? isPluginInstalled(pluginId) : false;
   const [canvasModalOpen, setCanvasModalOpen] = React.useState(false);
   const [canvasProjectName, setCanvasProjectName] = React.useState(() => getPluginCanvasProjectName());
 
@@ -647,13 +648,13 @@ const PluginWorkspace: React.FunctionComponent = () => {
     return (
       <PageSection hasBodyWrapper={false}>
         <EmptyState>
-          <Title headingLevel="h1" size="lg">{plugin.name} Not Deployed</Title>
+          <Title headingLevel="h1" size="lg">{plugin.displayName} Not Installed</Title>
           <EmptyStateBody>
-            Deploy {plugin.name} first to access its workspace and unlock canvas nodes.
+            Install {plugin.displayName} first to access its workspace and unlock canvas nodes.
           </EmptyStateBody>
           <EmptyStateActions>
-            <Button variant="primary" onClick={() => navigate(`/plugins/${plugin.id}`)}>
-              Deploy {plugin.name}
+            <Button variant="primary" onClick={() => navigate(`/plugins/${plugin.name}`)}>
+              Install {plugin.displayName}
             </Button>
             <Button variant="link" onClick={() => navigate('/plugins')}>Community Plugins</Button>
           </EmptyStateActions>
@@ -662,7 +663,7 @@ const PluginWorkspace: React.FunctionComponent = () => {
     );
   }
 
-  const WorkspaceContent = WORKSPACE_COMPONENTS[plugin.id];
+  const WorkspaceContent = WORKSPACE_COMPONENTS[plugin.name];
 
   const handleViewOnCanvas = () => {
     setCanvasProjectName(getPluginCanvasProjectName());
@@ -682,11 +683,14 @@ const PluginWorkspace: React.FunctionComponent = () => {
         <FlexItem>
           <CommunityPluginsBreadcrumb
             items={[
-              { label: 'Developer Preview', to: '/plugins/developer-preview?tab=plugins' },
-              { label: plugin.name, to: `/plugins/${plugin.id}` },
+              { label: 'Community Plugins', to: '/plugins' },
+              { label: plugin.displayName, to: `/plugins/${plugin.name}` },
               { label: 'Workspace' },
             ]}
           />
+        </FlexItem>
+        <FlexItem>
+          <SupportLevelBanner context="community-plugins" />
         </FlexItem>
         <FlexItem>
           <WorkspaceHeader

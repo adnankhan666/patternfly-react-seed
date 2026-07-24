@@ -40,6 +40,7 @@ import { WORKFLOW_TEMPLATES, WorkflowTemplate } from '../../data/workflowTemplat
 import { markCanvasLoadingTransition } from '../Canvas/utils/canvasLoadingTransition';
 import { DeployPhaseChecklist, DEPLOY_PHASE_ORDER } from '../components/DeployPhaseChecklist';
 import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 /* ── BYOH: Bring Your Own Helm ── */
 
@@ -409,6 +410,10 @@ const QuickstartsPage: React.FunctionComponent = () => {
               Pre-built workflow templates to get you started quickly
             </p>
           </Content>
+        </FlexItem>
+
+        <FlexItem>
+          <SupportLevelBanner context="community-plugins" />
         </FlexItem>
 
         <FlexItem>

@@ -34,13 +34,13 @@ const CommunityPopover: React.FunctionComponent<CommunityPopoverProps> = ({ chil
       icon: <RocketIcon style={{ color: '#8b5cf6' }} />,
     },
     {
-      label: 'Developer Preview features',
-      route: '/plugins/developer-preview',
+      label: 'Early Access features',
+      route: '/early-access',
       icon: <FlaskIcon style={{ color: '#f59e0b' }} />,
     },
     {
       label: `${deployedPlugins.length} plugin${deployedPlugins.length !== 1 ? 's' : ''} deployed`,
-      route: '/plugins/developer-preview?tab=plugins',
+      route: '/plugins/deployed',
       icon: <PluggedIcon style={{ color: '#10b981' }} />,
     },
   ];
@@ -89,7 +89,7 @@ const CommunityPopover: React.FunctionComponent<CommunityPopoverProps> = ({ chil
             isInline
             icon={<ArrowRightIcon />}
             iconPosition="end"
-            onClick={() => navigate('/plugins/developer-preview?tab=plugins')}
+            onClick={() => navigate('/plugins')}
           >
             View All Community Plugins
           </Button>

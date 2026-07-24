@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useMemo } from 'react';
 import { Label } from '@patternfly/react-core';
 import { NODE_TYPES, HELM_NODE_TYPES, WorkflowNode } from '../types';
-import { getDeployedPlugins, PLUGIN_DEPLOYED_EVENT } from '../../../data/pluginRegistry';
+import { getDeployedPlugins, PLUGIN_STATE_EVENT } from '../../../data/pluginRegistry';
 
 interface NodePanelProps {
   onDragStart: (nodeType: WorkflowNode, e: React.DragEvent) => void;
@@ -41,10 +41,10 @@ const NodePanel: React.FunctionComponent<NodePanelProps> = React.memo(({ onDragS
   React.useEffect(() => {
     const refresh = () => setDeployedVersion((v) => v + 1);
     window.addEventListener('storage', refresh);
-    window.addEventListener(PLUGIN_DEPLOYED_EVENT, refresh);
+    window.addEventListener(PLUGIN_STATE_EVENT, refresh);
     return () => {
       window.removeEventListener('storage', refresh);
-      window.removeEventListener(PLUGIN_DEPLOYED_EVENT, refresh);
+      window.removeEventListener(PLUGIN_STATE_EVENT, refresh);
     };
   }, []);
 
@@ -55,7 +55,7 @@ const NodePanel: React.FunctionComponent<NodePanelProps> = React.memo(({ onDragS
     void deployedVersion;
     if (helmMode) return [];
     return getDeployedPlugins().flatMap((plugin) =>
-      plugin.nodes.map((node) => pluginNodeToWorkflowNode(plugin.id, plugin.name, node))
+      plugin.nodes.map((node) => pluginNodeToWorkflowNode(plugin.name, plugin.displayName, node))
     );
   }, [helmMode, deployedVersion]);
 

@@ -23,12 +23,13 @@ import { CheckCircleIcon, ExternalLinkAltIcon, CubesIcon } from '@patternfly/rea
 import {
   PLUGINS,
   PLUGIN_CATEGORIES,
-  PLUGIN_DEPLOYED_EVENT,
+  PLUGIN_STATE_EVENT,
   getDeployedPluginIds,
   getPluginById,
   getPluginWorkspacePath,
 } from '../../data/pluginRegistry';
 import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 const categoryColors: Record<string, string> = {
   'optimization': '#8b5cf6',
@@ -46,10 +47,10 @@ const CommunityPluginsDeployed: React.FunctionComponent = () => {
   React.useEffect(() => {
     const refresh = () => setDeployedIds(getDeployedPluginIds());
     refresh();
-    window.addEventListener(PLUGIN_DEPLOYED_EVENT, refresh);
+    window.addEventListener(PLUGIN_STATE_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {
-      window.removeEventListener(PLUGIN_DEPLOYED_EVENT, refresh);
+      window.removeEventListener(PLUGIN_STATE_EVENT, refresh);
       window.removeEventListener('storage', refresh);
     };
   }, []);
@@ -79,6 +80,10 @@ const CommunityPluginsDeployed: React.FunctionComponent = () => {
         </FlexItem>
 
         <FlexItem>
+          <SupportLevelBanner context="community-plugins" />
+        </FlexItem>
+
+        <FlexItem>
           {deployedPlugins.length === 0 ? (
             <EmptyState>
               <CubesIcon style={{ fontSize: '3rem', color: '#9ca3af' }} />
@@ -97,11 +102,11 @@ const CommunityPluginsDeployed: React.FunctionComponent = () => {
               {deployedPlugins.map((plugin) => {
                 const color = categoryColors[plugin.category] || '#6b7280';
                 return (
-                  <GalleryItem key={plugin.id}>
+                  <GalleryItem key={plugin.name}>
                     <Card
                       isFullHeight
                       style={{ borderTop: `3px solid ${color}`, cursor: 'pointer' }}
-                      onClick={() => navigate(`/plugins/${plugin.id}`)}
+                      onClick={() => navigate(`/plugins/${plugin.name}`)}
                     >
                       <CardHeader>
                         <CardTitle>
@@ -110,10 +115,10 @@ const CommunityPluginsDeployed: React.FunctionComponent = () => {
                               <span style={{ fontSize: '1.5rem' }}>{plugin.icon}</span>
                             </FlexItem>
                             <FlexItem flex={{ default: 'flex_1' }}>
-                              <span style={{ fontWeight: 600 }}>{plugin.name}</span>
+                              <span style={{ fontWeight: 600 }}>{plugin.displayName}</span>
                             </FlexItem>
                             <FlexItem>
-                              <Label color="green" isCompact>Deployed</Label>
+                              <Label color="green" isCompact>Installed</Label>
                             </FlexItem>
                           </Flex>
                         </CardTitle>
@@ -137,7 +142,7 @@ const CommunityPluginsDeployed: React.FunctionComponent = () => {
                           iconPosition="end"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(getPluginWorkspacePath(plugin.id));
+                            navigate(getPluginWorkspacePath(plugin.name));
                           }}
                         >
                           Open workspace

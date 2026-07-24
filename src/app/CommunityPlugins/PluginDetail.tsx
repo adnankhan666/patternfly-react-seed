@@ -36,20 +36,21 @@ import {
   CheckCircleIcon,
   ExternalLinkAltIcon,
 } from '@patternfly/react-icons';
-import { getPluginById, PLUGIN_CATEGORIES, getPluginWorkspacePath, getDeployedPluginIds, setDeployedPluginIds } from '../../data/pluginRegistry';
+import {
+  getPluginById,
+  PLUGIN_CATEGORIES,
+  getPluginWorkspacePath,
+  getPluginState,
+  isPluginInstalled,
+  simulateInstall,
+  simulateRemove,
+  PLUGIN_STATE_EVENT,
+  LifecycleStep,
+} from '../../data/pluginRegistry';
 import { CommunityPluginsBreadcrumb } from './CommunityPluginsBreadcrumb';
+import { SupportLevelBanner } from '../components/SupportLevelBanner';
 
 type WizardStep = 'configure' | 'deploying' | 'done';
-
-const DEPLOY_PHASES = [
-  'Validating plugin compatibility...',
-  'Pulling plugin image...',
-  'Configuring namespace resources...',
-  'Applying RBAC policies...',
-  'Deploying plugin operator...',
-  'Running health checks...',
-  'Finalizing deployment...',
-];
 
 const PluginDetail: React.FunctionComponent = () => {
   const { pluginId } = useParams<{ pluginId: string }>();
@@ -57,54 +58,54 @@ const PluginDetail: React.FunctionComponent = () => {
   const plugin = pluginId ? getPluginById(pluginId) : undefined;
 
   const [deployed, setDeployed] = React.useState(() => {
-    return pluginId ? getDeployedPluginIds().includes(pluginId) : false;
+    return pluginId ? isPluginInstalled(pluginId) : false;
   });
 
   const [wizardOpen, setWizardOpen] = React.useState(false);
   const [wizardStep, setWizardStep] = React.useState<WizardStep>('configure');
-  const [namespace, setNamespace] = React.useState('default');
-  const [deployProgress, setDeployProgress] = React.useState(0);
-  const [deployPhase, setDeployPhase] = React.useState('');
+  const [namespace, setNamespace] = React.useState('');
+  const [lifecycleSteps, setLifecycleSteps] = React.useState<LifecycleStep[]>([]);
 
   React.useEffect(() => {
     localStorage.setItem('visitedPlugins', 'true');
   }, []);
 
+  React.useEffect(() => {
+    if (!pluginId) return;
+    const refresh = () => setDeployed(isPluginInstalled(pluginId));
+    window.addEventListener(PLUGIN_STATE_EVENT, refresh);
+    return () => window.removeEventListener(PLUGIN_STATE_EVENT, refresh);
+  }, [pluginId]);
+
   const startDeployWizard = () => {
     setWizardStep('configure');
-    setNamespace('default');
-    setDeployProgress(0);
-    setDeployPhase('');
+    setNamespace(plugin?.name ?? 'default');
+    setLifecycleSteps([]);
     setWizardOpen(true);
   };
 
-  const runDeploy = React.useCallback(() => {
+  const runDeploy = React.useCallback(async () => {
+    if (!plugin) return;
     setWizardStep('deploying');
-    setDeployProgress(0);
 
-    let phase = 0;
-    const interval = setInterval(() => {
-      if (phase < DEPLOY_PHASES.length) {
-        setDeployPhase(DEPLOY_PHASES[phase]);
-        setDeployProgress(Math.round(((phase + 1) / DEPLOY_PHASES.length) * 100));
-        phase++;
-      } else {
-        clearInterval(interval);
-        const stored = getDeployedPluginIds();
-        if (!stored.includes(pluginId!)) {
-          setDeployedPluginIds([...stored, pluginId!]);
-        }
-        setDeployed(true);
-        setWizardStep('done');
-      }
-    }, 800);
+    const watchSteps = () => {
+      const state = getPluginState(plugin.name);
+      if (state?.steps) setLifecycleSteps([...state.steps]);
+    };
+    window.addEventListener(PLUGIN_STATE_EVENT, watchSteps);
 
-    return () => clearInterval(interval);
-  }, [pluginId]);
+    await simulateInstall(plugin, namespace || undefined);
 
-  const handleUndeploy = () => {
-    const updated = getDeployedPluginIds().filter((id) => id !== pluginId);
-    setDeployedPluginIds(updated);
+    window.removeEventListener(PLUGIN_STATE_EVENT, watchSteps);
+    const finalState = getPluginState(plugin.name);
+    if (finalState?.steps) setLifecycleSteps([...finalState.steps]);
+    setDeployed(true);
+    setWizardStep('done');
+  }, [plugin, namespace]);
+
+  const handleUndeploy = async () => {
+    if (!plugin) return;
+    await simulateRemove(plugin);
     setDeployed(false);
   };
 
@@ -132,6 +133,21 @@ const PluginDetail: React.FunctionComponent = () => {
   };
 
   const color = categoryColors[plugin.category] || '#6b7280';
+  const installMethodLabels: Record<string, string> = {
+    automatic: 'One-click install',
+    assisted: 'Guided install',
+    manual: 'Manual install',
+  };
+  const deploymentModelLabels: Record<string, string> = {
+    'per-project': 'Per-project',
+    'cluster-shared': 'Cluster-shared',
+    both: 'Per-project or Cluster-shared',
+  };
+
+  const deployProgress = lifecycleSteps.length > 0
+    ? Math.round((lifecycleSteps.filter((s) => s.status === 'completed').length / lifecycleSteps.length) * 100)
+    : 0;
+  const currentStep = lifecycleSteps.find((s) => s.status === 'running') ?? lifecycleSteps[lifecycleSteps.length - 1];
 
   return (
     <>
@@ -140,10 +156,14 @@ const PluginDetail: React.FunctionComponent = () => {
           <FlexItem>
             <CommunityPluginsBreadcrumb
               items={[
-                { label: 'Developer Preview', to: '/plugins/developer-preview?tab=plugins' },
-                { label: plugin.name },
+                { label: 'Community Plugins', to: '/plugins' },
+                { label: plugin.displayName },
               ]}
             />
+          </FlexItem>
+
+          <FlexItem>
+            <SupportLevelBanner context="community-plugins" />
           </FlexItem>
 
           <FlexItem>
@@ -156,18 +176,23 @@ const PluginDetail: React.FunctionComponent = () => {
                         <span style={{ fontSize: '3rem' }}>{plugin.icon}</span>
                       </FlexItem>
                       <FlexItem flex={{ default: 'flex_1' }}>
-                        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} wrap={{ default: 'wrap' }}>
                           <FlexItem>
-                            <Title headingLevel="h1" size="2xl">{plugin.name}</Title>
+                            <Title headingLevel="h1" size="2xl">{plugin.displayName}</Title>
                           </FlexItem>
                           <FlexItem>
                             <Label isCompact style={{ background: `${color}18`, color }}>
                               {PLUGIN_CATEGORIES[plugin.category]}
                             </Label>
                           </FlexItem>
+                          <FlexItem>
+                            <Label isCompact color={plugin.status === 'stable' ? 'green' : 'orange'}>
+                              {plugin.status}
+                            </Label>
+                          </FlexItem>
                           {deployed && (
                             <FlexItem>
-                              <Label color="blue" isCompact>Deployed</Label>
+                              <Label color="blue" isCompact>Installed</Label>
                             </FlexItem>
                           )}
                         </Flex>
@@ -179,39 +204,44 @@ const PluginDetail: React.FunctionComponent = () => {
                   <FlexItem>
                     <Flex gap={{ default: 'gapSm' }}>
                       {!deployed ? (
-                        <FlexItem>
-                          <Button variant="primary" icon={<DownloadIcon />} onClick={startDeployWizard}>
-                            Deploy Plugin
-                          </Button>
-                        </FlexItem>
+                        plugin.install.method !== 'manual' ? (
+                          <FlexItem>
+                            <Button variant="primary" icon={<DownloadIcon />} onClick={startDeployWizard}>
+                              {plugin.install.method === 'automatic' ? 'Install Plugin' : 'Configure & Install'}
+                            </Button>
+                          </FlexItem>
+                        ) : (
+                          <FlexItem>
+                            <Button
+                              variant="secondary"
+                              icon={<ExternalLinkAltIcon />}
+                              component="a"
+                              href={plugin.install.instructions}
+                              target="_blank"
+                            >
+                              View Install Instructions
+                            </Button>
+                          </FlexItem>
+                        )
                       ) : (
                         <>
                           <FlexItem>
                             <Button
                               variant="primary"
                               icon={<ExternalLinkAltIcon />}
-                              onClick={() => navigate(getPluginWorkspacePath(plugin.id))}
+                              onClick={() => navigate(getPluginWorkspacePath(plugin.name))}
                             >
                               Open Workspace
                             </Button>
                           </FlexItem>
                           <FlexItem>
                             <Button variant="secondary" icon={<TrashIcon />} isDanger onClick={handleUndeploy}>
-                              Undeploy
+                              Remove
                             </Button>
                           </FlexItem>
                         </>
                       )}
                     </Flex>
-                  </FlexItem>
-
-                  <Divider />
-
-                  <FlexItem>
-                    <Content>
-                      <Title headingLevel="h3" size="md" style={{ marginBottom: '8px' }}>About</Title>
-                      <p style={{ color: '#374151', lineHeight: 1.6 }}>{plugin.longDescription}</p>
-                    </Content>
                   </FlexItem>
 
                   <Divider />
@@ -234,16 +264,70 @@ const PluginDetail: React.FunctionComponent = () => {
                         <DescriptionListDescription>{plugin.version}</DescriptionListDescription>
                       </DescriptionListGroup>
                       <DescriptionListGroup>
-                        <DescriptionListTerm>Author</DescriptionListTerm>
-                        <DescriptionListDescription>{plugin.author}</DescriptionListDescription>
+                        <DescriptionListTerm>Maintainer</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          {plugin.maintainer.name} (<code>@{plugin.maintainer.github}</code>)
+                        </DescriptionListDescription>
                       </DescriptionListGroup>
                       <DescriptionListGroup>
-                        <DescriptionListTerm>Category</DescriptionListTerm>
-                        <DescriptionListDescription>{PLUGIN_CATEGORIES[plugin.category]}</DescriptionListDescription>
+                        <DescriptionListTerm>Maintenance</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <Label isCompact color={plugin.maintenance === 'red-hat' ? 'red' : 'blue'}>
+                            {plugin.maintenance === 'red-hat' ? 'Red Hat' : 'Community'}
+                          </Label>
+                        </DescriptionListDescription>
                       </DescriptionListGroup>
                       <DescriptionListGroup>
-                        <DescriptionListTerm>Plugin ID</DescriptionListTerm>
-                        <DescriptionListDescription><code>{plugin.id}</code></DescriptionListDescription>
+                        <DescriptionListTerm>Install Method</DescriptionListTerm>
+                        <DescriptionListDescription>{installMethodLabels[plugin.install.method]}</DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Deployment Model</DescriptionListTerm>
+                        <DescriptionListDescription>{deploymentModelLabels[plugin.deploymentModel]}</DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>RHOAI Compatibility</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          {plugin.rhoaiCompatibility.minVersion}+ (tested: {plugin.rhoaiCompatibility.testedVersions.join(', ')})
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Container Image</DescriptionListTerm>
+                        <DescriptionListDescription><code>{plugin.image.repository}:{plugin.image.tag}</code></DescriptionListDescription>
+                      </DescriptionListGroup>
+                      {plugin.bffImage && (
+                        <DescriptionListGroup>
+                          <DescriptionListTerm>BFF Image</DescriptionListTerm>
+                          <DescriptionListDescription><code>{plugin.bffImage.repository}:{plugin.bffImage.tag}</code></DescriptionListDescription>
+                        </DescriptionListGroup>
+                      )}
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>MF Scope</DescriptionListTerm>
+                        <DescriptionListDescription><code>{plugin.remote.spec.scope}</code></DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>RBAC</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          {plugin.rbac.clusterRoles ? (
+                            <Label isCompact color="orange">Cluster roles required</Label>
+                          ) : (
+                            <Label isCompact color="green">Namespace-scoped</Label>
+                          )}
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                      {plugin.support.repo && (
+                        <DescriptionListGroup>
+                          <DescriptionListTerm>Repository</DescriptionListTerm>
+                          <DescriptionListDescription>
+                            <Button variant="link" isInline component="a" href={plugin.support.repo} target="_blank" icon={<ExternalLinkAltIcon />} iconPosition="end">
+                              {plugin.repo}
+                            </Button>
+                          </DescriptionListDescription>
+                        </DescriptionListGroup>
+                      )}
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Plugin Name</DescriptionListTerm>
+                        <DescriptionListDescription><code>{plugin.name}</code></DescriptionListDescription>
                       </DescriptionListGroup>
                     </DescriptionList>
                   </FlexItem>
@@ -254,14 +338,13 @@ const PluginDetail: React.FunctionComponent = () => {
         </Flex>
       </PageSection>
 
-      {/* Deploy Wizard Modal */}
       <Modal
         variant={ModalVariant.medium}
         isOpen={wizardOpen}
         onClose={() => wizardStep !== 'deploying' && setWizardOpen(false)}
-        aria-label="Deploy plugin"
+        aria-label="Install plugin"
       >
-        <ModalHeader title={`Deploy ${plugin.name}`} />
+        <ModalHeader title={`Install ${plugin.displayName}`} />
         <ModalBody>
           {wizardStep === 'configure' && (
             <Flex direction={{ default: 'column' }} gap={{ default: 'gapLg' }}>
@@ -271,7 +354,7 @@ const PluginDetail: React.FunctionComponent = () => {
                     <span style={{ fontSize: '2.5rem' }}>{plugin.icon}</span>
                   </FlexItem>
                   <FlexItem>
-                    <Title headingLevel="h3" size="lg">{plugin.name} v{plugin.version}</Title>
+                    <Title headingLevel="h3" size="lg">{plugin.displayName} v{plugin.version}</Title>
                     <p style={{ color: '#6b7280', margin: '4px 0 0', fontSize: '0.9rem' }}>
                       {plugin.description}
                     </p>
@@ -296,29 +379,43 @@ const PluginDetail: React.FunctionComponent = () => {
                 <Title headingLevel="h4" size="md" style={{ marginBottom: '8px' }}>What will be deployed</Title>
                 <DescriptionList isCompact>
                   <DescriptionListGroup>
-                    <DescriptionListTerm>Plugin Operator</DescriptionListTerm>
-                    <DescriptionListDescription>{plugin.id}-operator</DescriptionListDescription>
+                    <DescriptionListTerm>Helm Chart</DescriptionListTerm>
+                    <DescriptionListDescription><code>{plugin.install.helm?.registry ?? 'N/A'}</code></DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>
                     <DescriptionListTerm>Namespace</DescriptionListTerm>
-                    <DescriptionListDescription>{namespace}</DescriptionListDescription>
+                    <DescriptionListDescription>{namespace || plugin.name}</DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>
-                    <DescriptionListTerm>Components</DescriptionListTerm>
+                    <DescriptionListTerm>Deployment Model</DescriptionListTerm>
+                    <DescriptionListDescription>{deploymentModelLabels[plugin.deploymentModel]}</DescriptionListDescription>
+                  </DescriptionListGroup>
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>MF Registration</DescriptionListTerm>
                     <DescriptionListDescription>
-                      <Flex gap={{ default: 'gapXs' }} wrap={{ default: 'wrap' }}>
-                        {plugin.features.map((f) => (
-                          <Label key={f} isCompact>{f}</Label>
-                        ))}
-                      </Flex>
+                      <code>{plugin.remote.spec.scope}</code> will be added to MODULE_FEDERATION_CONFIG
                     </DescriptionListDescription>
                   </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>RBAC</DescriptionListTerm>
-                    <DescriptionListDescription>ServiceAccount, Role, RoleBinding</DescriptionListDescription>
-                  </DescriptionListGroup>
+                  {plugin.bffImage && (
+                    <DescriptionListGroup>
+                      <DescriptionListTerm>BFF Service</DescriptionListTerm>
+                      <DescriptionListDescription>
+                        <code>{plugin.name}-bff</code> (port 3000)
+                      </DescriptionListDescription>
+                    </DescriptionListGroup>
+                  )}
                 </DescriptionList>
               </FlexItem>
+
+              {plugin.install.prerequisites && plugin.install.prerequisites.length > 0 && (
+                <FlexItem>
+                  <Alert variant="info" isInline title="Prerequisites">
+                    {plugin.install.prerequisites.map((p) => (
+                      <div key={p.name} style={{ fontSize: '0.85rem' }}>{p.description} (<code>{p.name}</code>)</div>
+                    ))}
+                  </Alert>
+                </FlexItem>
+              )}
             </Flex>
           )}
 
@@ -328,7 +425,7 @@ const PluginDetail: React.FunctionComponent = () => {
                 <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }} justifyContent={{ default: 'justifyContentCenter' }}>
                   <FlexItem><Spinner size="lg" /></FlexItem>
                   <FlexItem>
-                    <Title headingLevel="h3" size="lg">Deploying {plugin.name}...</Title>
+                    <Title headingLevel="h3" size="lg">Installing {plugin.displayName}...</Title>
                   </FlexItem>
                 </Flex>
               </FlexItem>
@@ -336,33 +433,30 @@ const PluginDetail: React.FunctionComponent = () => {
               <FlexItem>
                 <Progress
                   value={deployProgress}
-                  title="Deployment progress"
+                  title="Installation progress"
                   measureLocation={ProgressMeasureLocation.outside}
-                  aria-label="Deploy progress"
+                  aria-label="Install progress"
                 />
               </FlexItem>
 
               <FlexItem>
-                <div style={{
-                  background: '#111827',
-                  borderRadius: '6px',
-                  padding: '12px 16px',
-                  fontFamily: 'monospace',
-                  fontSize: '0.85rem',
-                  color: '#10b981',
-                  minHeight: '60px',
-                }}>
-                  <span style={{ color: '#6b7280' }}>$</span> {deployPhase}
-                  <span className="terminal-cursor" style={{
-                    display: 'inline-block',
-                    width: '8px',
-                    height: '14px',
-                    background: '#10b981',
-                    marginLeft: '4px',
-                    animation: 'blink 1s step-end infinite',
-                    verticalAlign: 'text-bottom',
-                  }} />
-                </div>
+                <Flex direction={{ default: 'column' }} gap={{ default: 'gapSm' }}>
+                  {lifecycleSteps.map((step) => (
+                    <Flex key={step.id} alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                      <FlexItem>
+                        {step.status === 'completed' && <CheckCircleIcon style={{ color: '#16a34a' }} />}
+                        {step.status === 'running' && <Spinner size="sm" />}
+                        {step.status === 'pending' && <span style={{ color: '#9ca3af' }}>&#x25CB;</span>}
+                        {step.status === 'failed' && <span style={{ color: '#ef4444' }}>&#x2717;</span>}
+                      </FlexItem>
+                      <FlexItem>
+                        <span style={{ color: step.status === 'pending' ? '#9ca3af' : undefined, fontSize: '0.9rem' }}>
+                          {step.label}
+                        </span>
+                      </FlexItem>
+                    </Flex>
+                  ))}
+                </Flex>
               </FlexItem>
 
               <style>{`@keyframes blink { 50% { opacity: 0; } }`}</style>
@@ -380,20 +474,20 @@ const PluginDetail: React.FunctionComponent = () => {
                 <CheckCircleIcon style={{ fontSize: '3.5rem', color: '#16a34a' }} />
               </FlexItem>
               <FlexItem>
-                <Title headingLevel="h3" size="xl">{plugin.name} Deployed</Title>
+                <Title headingLevel="h3" size="xl">{plugin.displayName} Installed</Title>
               </FlexItem>
               <FlexItem>
                 <Alert
                   variant="success"
                   isInline
                   isPlain
-                  title={`${plugin.name} v${plugin.version} has been deployed to namespace "${namespace}" successfully.`}
+                  title={`${plugin.displayName} v${plugin.version} has been installed to namespace "${namespace || plugin.name}" and registered in MODULE_FEDERATION_CONFIG.`}
                 />
               </FlexItem>
               <FlexItem>
                 <Flex gap={{ default: 'gapXs' }} wrap={{ default: 'wrap' }} justifyContent={{ default: 'justifyContentCenter' }}>
-                  {plugin.features.map((f) => (
-                    <Label key={f} color="green" isCompact>{f} ready</Label>
+                  {lifecycleSteps.filter((s) => s.status === 'completed').map((s) => (
+                    <Label key={s.id} color="green" isCompact>{s.label}</Label>
                   ))}
                 </Flex>
               </FlexItem>
@@ -410,7 +504,7 @@ const PluginDetail: React.FunctionComponent = () => {
                   isDisabled={!namespace.trim()}
                   icon={<DownloadIcon />}
                 >
-                  Deploy
+                  Install
                 </Button>
               </FlexItem>
               <FlexItem>
@@ -419,7 +513,9 @@ const PluginDetail: React.FunctionComponent = () => {
             </Flex>
           )}
           {wizardStep === 'deploying' && (
-            <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>Please wait, deployment in progress...</p>
+            <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+              {currentStep ? currentStep.label : 'Please wait, installation in progress...'}
+            </p>
           )}
           {wizardStep === 'done' && (
             <Flex gap={{ default: 'gapSm' }}>
@@ -428,7 +524,7 @@ const PluginDetail: React.FunctionComponent = () => {
                 icon={<ExternalLinkAltIcon />}
                 onClick={() => {
                   setWizardOpen(false);
-                  navigate(getPluginWorkspacePath(plugin.id));
+                  navigate(getPluginWorkspacePath(plugin.name));
                 }}
               >
                 Go to Workspace
